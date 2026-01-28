@@ -1,0 +1,17 @@
+# Nex Specific
+.env
+.env.local
+
+# Dependency directories
+node_modules/
+jspm_packages/
+
+# TypeScript (por si migras luego)
+*.tsbuildinfo
+
+# Optional repl history
+.node_repl_history
+
+# Output de compilación
+/dist
+/build
