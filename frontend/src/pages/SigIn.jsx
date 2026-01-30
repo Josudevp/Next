@@ -12,13 +12,13 @@ const SigIn = () => {
                 <h2 className='text-[#2563EB] text-3xl font-bold absolute top-8 left-8'>Next</h2>
                 <h1 className='text-4xl font-bold text-pretty px-4 leadding-2'>
                     Empieza y avanza <br />
-                    <span className='font-medium text-xl text-pretty'><span className='text-[#2563EB]'>Empieza</span>  a mostrar tus habilidades y conecta con oportunidades reales de <span className='text-[#4ADE80]'>empleo</span></span>
+                    <span className='font-medium text-xl lg:text-2xl text-pretty'><span className='text-[#2563EB]'>Empieza</span>  a mostrar tus habilidades y conecta con oportunidades reales de <span className='text-[#4ADE80]'>empleo</span></span>
                 </h1>
                 <img src={SigInImage} alt="Imagen de trabajo" className='w-full max-w-120 xl:max-w-150'/>
             </div>
             {/* Rigth */}
-            <div className="flex justify-center items-center px-10 bg-white sm:w-120 h-screen lg:w-[55%] sm:bg-[radial-gradient(circle,#69809E_0%,#31445E_100%)]">
-                <div className="bg-white py-8 px-12 rounded-2xl text-center flex flex-col gap-y-3">
+            <div className="flex justify-center items-center px-10 bg-white sm:w-200 h-screen lg:w-[55%] sm:bg-[radial-gradient(circle,#69809E_0%,#31445E_100%)] sm:shadow-[-5px_0_10px_3px_rgba(0,0,0,0.3)]">
+                <div className="bg-white sm:py-8 sm:px-10 rounded-2xl text-center flex flex-col gap-y-3 sm:w-80  md:w-100  2xl:w-120">
                     <h2 className="text-2xl font-bold">Crear cuenta</h2>
                     <hr className='hidden sm:block text-gray-300' />
                     <form action="">
@@ -28,7 +28,7 @@ const SigIn = () => {
                         <InputField type="password" placeholder="Confirmar contraseña" Icono={Eye} />
                         <Button text='Crear Cuenta' />
                     </form>
-                    <p className="mt-5 text-[14px] text-[#2563EB]">¿Ya tienes cuenta? <span className="font-bold cursor-pointer">Iniciar sesion</span></p>
+                    <p className="mt-5 text-[14px] ">¿Ya tienes cuenta? <a href="#" className="font-bold cursor-pointer text-[#2563EB]">Iniciar sesion</a></p>
                 </div>
             </div>
         </div>
