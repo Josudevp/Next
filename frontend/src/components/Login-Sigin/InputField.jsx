@@ -4,7 +4,7 @@ const InputField = ({ type, Icono, placeholder }) => {
             <input
                 type={type}
                 placeholder={placeholder}
-                className="placeholder:opacity-50 focus:outline-0 w-[90%]"
+                className="placeholder:opacity-50 focus:outline-0 w-[90%] py-1"
             />
             {Icono && <Icono size={25} className='opacity-60' />}
         </label>
