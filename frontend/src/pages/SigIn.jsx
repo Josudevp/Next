@@ -20,17 +20,32 @@ const SigIn = () => {
             ...formData,
             [name]: value
         })
+        if (errores[name]) {
+        setErrores({
+            ...errores,
+            [name]: null // ...lo borramos de la libreta de errores
+        });
+    }
     };
 
-    //Envio de datos
+    //Envio de datos y manejo de errores
+    const [errores, setErrores] = useState({})
+
     const handleSubmit = (e) => {
+        let nuevosErrores = {}
         e.preventDefault()
-        console.log("🚀 Enviando datos a Nex...", formData);
         if (formData.password != formData.confirmPassword) {
-            alert("Las contraseñas no coinciden.")
+            nuevosErrores.confirmPassword = "Las contraseñas no coinciden";
+        }
+        if (formData.password.length < 8) {
+            nuevosErrores.password = "La contraseña debe contener almenos 8 caracteres"
+        }
+        if (Object.keys(nuevosErrores).length > 0) {
+            setErrores(nuevosErrores);
             return;
         }
-        alert("¡Registro exitoso!");
+        setErrores({}); // Limpiamos errores previos
+        console.log("🚀 Datos listos para el Instructor IA:", formData);
     };
 
     return (
@@ -70,12 +85,13 @@ const SigIn = () => {
                         <InputField
                             type="password"
                             placeholder="Contraseña"
-                            Icono={Eye} 
+                            Icono={Eye}
                             name='password'
                             onChange={handleChange}
                             value={formData.password}
+                            error={errores.password}
                         />
-                            
+
                         <InputField
                             type="password"
                             placeholder="Confirmar contraseña"
@@ -83,6 +99,7 @@ const SigIn = () => {
                             name='confirmPassword'
                             onChange={handleChange}
                             value={formData.confirmPassword}
+                            error={errores.confirmPassword}
                         />
                         <Button text='Crear Cuenta' />
                     </form>
