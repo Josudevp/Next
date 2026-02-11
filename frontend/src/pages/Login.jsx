@@ -1,8 +1,9 @@
 import { useState } from 'react'
-import Button from '../components/Login-Sigin/Button'
-import InputField from '../components/Login-Sigin/InputField'
+import Button from '../components/Button'
+import InputField from '../components/InputField'
 import { Mail, Lock } from 'lucide-react'
-import LoginJobImg from '../assets/login/LoginJob.png'
+import LoginJobImg from '../assets/login/Login.webp'
+import LogoNext from '../components/LogoNext'
 
 const Login = () => {
     const [formData, setFormData] = useState({
@@ -58,7 +59,7 @@ const Login = () => {
 
             {/* Sección de imagen/hero - oculta en mobile */}
             <div className='hidden sm:flex flex-col items-center justify-center relative h-screen grow text-center'>
-                <h2 className='text-[#2563EB] text-3xl font-bold absolute top-8 left-8'>Next</h2>
+                <LogoNext />
                 <h1 className='text-4xl font-bold text-pretty px-4'>
                     Conecta tu talento <br />
                     <span className='font-medium'>con tu <span className='text-[#2563EB]'>proximo</span> <span className='text-[#4ADE80]'>empleo</span></span>

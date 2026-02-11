@@ -1,8 +1,9 @@
-import Button from "../components/Login-Sigin/Button"
-import InputField from "../components/Login-Sigin/InputField"
+import Button from "../components/Button"
+import InputField from "../components/InputField"
 import { Mail, Eye, UserRound } from 'lucide-react'
-import SigInImage from '../assets/SigIn/SigInJob.png'
+import SigInImage from '../assets/SigIn/signUpJob.webp'
 import { useState } from "react"
+import LogoNext from '../components/LogoNext'
 
 const SigIn = () => {
 
@@ -53,7 +54,7 @@ const SigIn = () => {
             <h2 className='flex text-[#2563EB] text-3xl font-bold absolute top-8 left-8 sm:hidden'>Next</h2>
             {/* Left */}
             <div className="hidden sm:flex flex-col items-center justify-center relative h-screen grow text-center ">
-                <h2 className='text-[#2563EB] text-3xl font-bold absolute top-8 left-8'>Next</h2>
+                <LogoNext />
                 <h1 className='text-4xl font-bold text-pretty px-4 leadding-2'>
                     Empieza y avanza <br />
                     <span className='font-medium text-xl lg:text-2xl text-pretty'><span className='text-[#2563EB]'>Empieza</span>  a mostrar tus habilidades y conecta con oportunidades reales de <span className='text-[#4ADE80]'>empleo</span></span>
