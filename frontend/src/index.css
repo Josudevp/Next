@@ -1,1 +1,12 @@
 @import "tailwindcss";
+
+@theme {
+  --color-next-primary: #2563EB;
+  --color-next-secondary: #22D3EE;
+  --color-next-dark: #0F172A;
+  --color-next-gray: #F8FAFC;
+  --color-next-success: #10B981;
+  
+  --background-image-next-gradient: linear-gradient(to right, #2563EB, #22D3EE);
+}
+

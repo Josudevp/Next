@@ -21,7 +21,7 @@ const Login = () => {
     return (
         <div className='flex flex-col-reverse sm:flex-row h-screen w-full'>
             {/* Sección del formulario */}
-            <h2 className='flex sm:hidden text-[#2563EB] text-3xl font-bold absolute top-8 left-8'>Next</h2>
+            <h2 className='flex sm:hidden text-next-primary text-3xl font-bold absolute top-8 left-8'>Next</h2>
             <div className='bg-white sm:w-120 h-screen lg:w-[55%] flex items-center justify-center sm:bg-[#31445E] sm:bg-[radial-gradient(circle,#69809E_0%,#31445E_100%)] shadow-[5px_0_10px_3px_rgba(0,0,0,0.3)] py-8 px-5'>
                 <div className='bg-white py-8 px-12 rounded-2xl text-center flex flex-col gap-y-6'>
                     <h2 className='text-2xl font-bold'>Bienvenido</h2>
@@ -53,7 +53,7 @@ const Login = () => {
                         <Button text='Iniciar sesion' />
                     </form>
                     <p className='text-xs sm:text-sm'>¿Olvidaste tu contraseña?</p>
-                    <p className='text-xs sm:text-sm'>¿No tienes cuenta? <span className='font-bold text-[#2563EB] cursor-pointer'>Crear una</span></p>
+                    <p className='text-xs sm:text-sm'>¿No tienes cuenta? <span className='font-bold text-next-primary cursor-pointer'>Crear una</span></p>
                 </div>
             </div>
 
@@ -62,7 +62,7 @@ const Login = () => {
                 <LogoNext />
                 <h1 className='text-4xl font-bold text-pretty px-4'>
                     Conecta tu talento <br />
-                    <span className='font-medium'>con tu <span className='text-[#2563EB]'>proximo</span> <span className='text-[#4ADE80]'>empleo</span></span>
+                    <span className='font-medium'>con tu <span className='text-next-primary'>proximo</span> <span className='text-[#4ADE80]'>empleo</span></span>
                 </h1>
                 <img src={LoginJobImg} alt="Imagen de trabajo" className='w-full max-w-120 xl:max-w-150' />
             </div>
