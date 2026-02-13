@@ -19,15 +19,19 @@ const Login = () => {
         })
     }
     return (
-        <div className='flex flex-col-reverse sm:flex-row h-screen w-full'>
+        <div className='flex flex-col-reverse sm:flex-row h-screen w-full relative'>
+            {/* Logo mobile */}
+            <div className='sm:hidden absolute top-6 left-6 z-10'>
+                <LogoNext />
+            </div>
+
             {/* Sección del formulario */}
-            <h2 className='flex sm:hidden text-next-primary text-3xl font-bold absolute top-8 left-8'>Next</h2>
-            <div className='bg-white sm:w-120 h-screen lg:w-[55%] flex items-center justify-center sm:bg-[#31445E] sm:bg-[radial-gradient(circle,#69809E_0%,#31445E_100%)] shadow-[5px_0_10px_3px_rgba(0,0,0,0.3)] py-8 px-5'>
-                <div className='bg-white py-8 px-12 rounded-2xl text-center flex flex-col gap-y-6'>
+            <div className='bg-white flex-1 sm:flex-none sm:w-[45%] lg:w-[45%] xl:w-[40%] h-screen flex items-center justify-center sm:bg-[#31445E] sm:bg-[radial-gradient(circle,#69809E_0%,#31445E_100%)] sm:shadow-[5px_0_10px_3px_rgba(0,0,0,0.3)] py-8 px-5'>
+                <div className='bg-white py-10 px-8 sm:px-10 md:px-14 rounded-2xl text-center flex flex-col gap-y-6 w-full max-w-md'>
                     <h2 className='text-2xl font-bold'>Bienvenido</h2>
                     <hr className='text-gray-300' />
-                    <form action="">
-                        <div>
+                    <form action="" aria-label="Formulario de inicio de sesión">
+                        <div className='flex flex-col gap-1'>
                             <InputField
                                 type="email"
                                 placeholder="Correo Electronico"
@@ -40,15 +44,14 @@ const Login = () => {
                                 type="password"
                                 placeholder="Contraseña"
                                 Icono={Lock}
-                                name= "password"
+                                name="password"
                                 value={formData.password}
                                 onChange={handleChange}
                             />
-
                         </div>
-                        <div className='flex gap-2'>
-                            <input type="checkbox" />
-                            <p className='opacity-80 text-sm'>Recordarme</p>
+                        <div className='flex items-center gap-2 mb-5'>
+                            <input type="checkbox" id="remember" className='cursor-pointer' />
+                            <label htmlFor="remember" className='opacity-80 text-sm cursor-pointer'>Recordarme</label>
                         </div>
                         <Button text='Iniciar sesion' />
                     </form>
@@ -58,13 +61,17 @@ const Login = () => {
             </div>
 
             {/* Sección de imagen/hero - oculta en mobile */}
-            <div className='hidden sm:flex flex-col items-center justify-center relative h-screen grow text-center'>
-                <LogoNext />
-                <h1 className='text-4xl font-bold text-pretty px-4'>
-                    Conecta tu talento <br />
-                    <span className='font-medium'>con tu <span className='text-next-primary'>proximo</span> <span className='text-[#4ADE80]'>empleo</span></span>
-                </h1>
-                <img src={LoginJobImg} alt="Imagen de trabajo" className='w-full max-w-120 xl:max-w-150' />
+            <div className='hidden sm:flex flex-1 flex-col h-screen text-center px-8 py-8'>
+                <div className='mb-auto'>
+                    <LogoNext />
+                </div>
+                <div className='flex flex-col items-center justify-center gap-4 flex-1'>
+                    <h1 className='text-3xl lg:text-4xl font-bold text-pretty px-4'>
+                        Conecta tu talento <br />
+                        <span className='font-medium'>con tu <span className='text-next-primary'>proximo</span> <span className='text-[#4ADE80]'>empleo</span></span>
+                    </h1>
+                    <img src={LoginJobImg} alt="Persona buscando empleo" className='w-full max-w-80 lg:max-w-120 xl:max-w-150' />
+                </div>
             </div>
         </div>
     )

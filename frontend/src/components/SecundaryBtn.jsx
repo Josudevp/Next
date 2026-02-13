@@ -1,6 +1,6 @@
 const SecundaryBtn = ({text}) => {
     return (
-        <button className="px-14 py-3 text-black border border-cyan-900 rounded-xl font-medium sm:text-sm md:text-lg cursor-pointer w-full">{text}</button>
+        <button className="px-14 py-3 md:py-4 text-black border border-cyan-900 rounded-2xl md:rounded-[2rem] font-medium text-sm md:text-base lg:text-lg cursor-pointer">{text}</button>
     )
 }
 

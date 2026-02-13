@@ -7,7 +7,6 @@ export default function Robot3D() {
       <div className="w-full h-[120%] absolute -top-[5%]">
         <Spline scene="https://prod.spline.design/9dHbiIYbbd-WCjPU/scene.splinecode" />
       </div>
-      {/* <div className='bg-white w-[50%] h-[10%] absolute bottom-4 right-0'></div> */}
     </div>
   );
 }

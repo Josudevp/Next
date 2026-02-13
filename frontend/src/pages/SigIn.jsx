@@ -50,23 +50,32 @@ const SigIn = () => {
     };
 
     return (
-        <div className="flex flex-col justify-center items-center h-screen w-full sm:flex-row">
-            <h2 className='flex text-[#2563EB] text-3xl font-bold absolute top-8 left-8 sm:hidden'>Next</h2>
-            {/* Left */}
-            <div className="hidden sm:flex flex-col items-center justify-center relative h-screen grow text-center ">
+        <div className="flex flex-col justify-center items-center h-screen w-full sm:flex-row relative">
+            {/* Logo mobile */}
+            <div className='sm:hidden absolute top-6 left-6 z-10'>
                 <LogoNext />
-                <h1 className='text-4xl font-bold text-pretty px-4 leadding-2'>
-                    Empieza y avanza <br />
-                    <span className='font-medium text-xl lg:text-2xl text-pretty'><span className='text-[#2563EB]'>Empieza</span>  a mostrar tus habilidades y conecta con oportunidades reales de <span className='text-[#4ADE80]'>empleo</span></span>
-                </h1>
-                <img src={SigInImage} alt="Imagen de trabajo" className='w-full max-w-120 xl:max-w-150' />
             </div>
-            {/* Rigth */}
-            <div className="flex justify-center items-center px-10 bg-white sm:w-200 h-screen lg:w-[55%] sm:bg-[radial-gradient(circle,#69809E_0%,#31445E_100%)] sm:shadow-[-5px_0_10px_3px_rgba(0,0,0,0.3)]">
-                <div className="bg-white sm:py-8 sm:px-10 rounded-2xl text-center flex flex-col gap-y-3 sm:w-80  md:w-100  2xl:w-120">
+
+            {/* Left - Hero Section */}
+            <div className="hidden sm:flex flex-1 flex-col h-screen text-center px-8 py-8">
+                <div className='mb-auto'>
+                    <LogoNext />
+                </div>
+                <div className='flex flex-col items-center justify-center gap-4 flex-1'>
+                    <h1 className='text-3xl lg:text-4xl font-bold text-pretty px-4 leading-snug'>
+                        Empieza y avanza <br />
+                        <span className='font-medium text-lg lg:text-2xl text-pretty'><span className='text-next-primary'>Empieza</span> a mostrar tus habilidades y conecta con oportunidades reales de <span className='text-[#4ADE80]'>empleo</span></span>
+                    </h1>
+                    <img src={SigInImage} alt="Persona registrándose para buscar empleo" className='w-full max-w-80 lg:max-w-120 xl:max-w-150' />
+                </div>
+            </div>
+
+            {/* Right - Form Section */}
+            <div className="flex justify-center items-center px-6 sm:px-10 bg-white flex-1 sm:flex-none sm:w-[45%] lg:w-[45%] xl:w-[40%] h-screen sm:bg-[radial-gradient(circle,#69809E_0%,#31445E_100%)] sm:shadow-[-5px_0_10px_3px_rgba(0,0,0,0.3)]">
+                <div className="bg-white sm:py-10 sm:px-10 md:px-14 rounded-2xl text-center flex flex-col gap-y-4 w-full max-w-md">
                     <h2 className="text-2xl font-bold">Crear cuenta</h2>
                     <hr className='hidden sm:block text-gray-300' />
-                    <form onSubmit={handleSubmit}>
+                    <form onSubmit={handleSubmit} aria-label="Formulario de registro">
                         <InputField
                             type="text"
                             placeholder="Nombre Completo"
@@ -104,7 +113,7 @@ const SigIn = () => {
                         />
                         <Button text='Crear Cuenta' />
                     </form>
-                    <p className="mt-5 text-[14px] ">¿Ya tienes cuenta? <a href="#" className="font-bold cursor-pointer text-[#2563EB]">Iniciar sesion</a></p>
+                    <p className="mt-5 text-[14px] ">¿Ya tienes cuenta? <a href="#" className="font-bold cursor-pointer text-next-primary">Iniciar sesion</a></p>
                 </div>
             </div>
         </div>

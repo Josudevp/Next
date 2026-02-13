@@ -1,6 +1,6 @@
 const Button = ({text}) => {
     return (
-        <button className="px-14 py-3 text-white bg-linear-to-r from-[#1B49AE] from-40% via-[#3473FF] via-80% to-next-primary to-100% rounded-xl font-medium sm:text-sm md:text-lg mt-5 cursor-pointer w-full">{text}</button>
+        <button className="px-14 py-3 md:py-4 text-white bg-gradient-to-r from-[#1B49AE] from-40% via-[#3473FF] via-80% to-next-primary to-100% rounded-2xl md:rounded-[2rem] font-medium text-sm md:text-base lg:text-lg cursor-pointer">{text}</button>
     )
 }
 
