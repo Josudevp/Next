@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom'
 import Robot3D from '../components/Robot3D'
 import SecundaryBtn from '../components/SecundaryBtn'
 import Button from '../components/Button'
@@ -5,12 +6,23 @@ import LogoGemini from '../assets/Logos/Gemini.svg'
 import LogoNext from '../components/LogoNext'
 
 const Home = () => {
+
+    const navigate = useNavigate()
+
+    const irAlSigin = () => {
+        navigate('/signin')
+    }
+
+    const irAlLogin = () => {
+        navigate('/login')
+    }
+
     return (
         <main className='bg-linear-to-b from-[#EFEFEF] from-50% via-[#BED5F3] via-75% to-[#587BA8] min-h-screen md:h-screen flex flex-col justify-between px-6 py-6 md:px-16 md:py-8 overflow-y-auto md:overflow-hidden'>
             {/* Logo - Always Top Left */}
-            <div className='mb-4 md:mb-0 md:absolute md:top-8 md:left-16'>
+            <nav className='mb-4 md:mb-0 md:absolute md:top-8 md:left-16'>
                 <LogoNext />
-            </div>
+            </nav>
 
             {/* Hero Section */}
             <div className='flex flex-col md:flex-row md:items-center md:justify-between gap-8 md:gap-12 max-w-7xl mx-auto w-full flex-1'>
@@ -38,11 +50,11 @@ const Home = () => {
                     
                     {/* Call to Action Buttons */}
                     <div className='flex flex-col items-center gap-4 md:gap-6 w-full'>
-                        <Button text={'Acelerar mi carrera'} />
+                        <Button text={'Acelerar mi carrera'} accion={irAlSigin}/>
                         
                         <hr className='w-34 border-none h-px bg-gray-400 opacity-80' />
                         
-                        <SecundaryBtn text={'Iniciar sesion'} />
+                        <SecundaryBtn text={'Iniciar sesion'} accion={irAlLogin}/>
                     </div>
                 </section>
             </div>

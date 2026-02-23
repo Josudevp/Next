@@ -1,44 +1,153 @@
 import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { Mail, Lock, AlertCircle } from 'lucide-react'
 import Button from '../components/Button'
 import InputField from '../components/InputField'
-import { Mail, Lock } from 'lucide-react'
 import LoginJobImg from '../assets/login/Login.webp'
 import LogoNext from '../components/LogoNext'
 
-const Login = () => {
-    const [formData, setFormData] = useState({
-        email: '',
-        password: ''
-    })
+// ── Helpers de validación ──────────────────────────────────────────────────────
+// Para el backend: mover a src/utils/validators.js
+const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+const sanitize = (value) => value.trim()
 
+// ── Componente ─────────────────────────────────────────────────────────────────
+const Login = () => {
+    const navigate = useNavigate()
+
+    const [formData, setFormData] = useState({ email: '', password: '' })
+    const [errores, setErrores] = useState({})
+    const [isLoading, setIsLoading] = useState(false)
+
+    // Actualiza el campo y limpia su error en tiempo real
     const handleChange = (e) => {
         const { name, value } = e.target
-        setFormData({
-            ...formData,
-            [name]: value
-        })
+        setFormData(prev => ({ ...prev, [name]: value }))
+        if (errores[name]) {
+            setErrores(prev => ({ ...prev, [name]: null }))
+        }
     }
+
+    // Validación completa antes de enviar
+    const validate = () => {
+        const errs = {}
+        const email = sanitize(formData.email)
+        const password = formData.password
+
+        if (!email) errs.email = 'El correo es obligatorio.'
+        else if (!isValidEmail(email)) errs.email = 'Ingresa un correo válido.'
+        if (!password) errs.password = 'La contraseña es obligatoria.'
+
+        return errs
+    }
+
+    // ✅ Verificación contra localStorage + navegación
+    // Para el backend: reemplazar con → const res = await fetch('/api/auth/login', { method: 'POST', body: JSON.stringify({email, password}) })
+    const handleSubmit = async (e) => {
+        e.preventDefault()
+        const errs = validate()
+        if (Object.keys(errs).length > 0) { setErrores(errs); return }
+
+        setIsLoading(true)
+
+        // Simula latencia de red para que la UI no se sienta brusca
+        await new Promise(r => setTimeout(r, 600))
+
+        const raw = localStorage.getItem('next_user')
+        const email = sanitize(formData.email)
+
+        if (!raw) {
+            setErrores({ global: 'No encontramos esa cuenta. ¿Ya te registraste?' })
+            setIsLoading(false)
+            return
+        }
+
+        const user = JSON.parse(raw)
+
+        if (user.email.toLowerCase() !== email.toLowerCase()) {
+            setErrores({ global: 'Correo o contraseña incorrectos.' })
+            setIsLoading(false)
+            return
+        }
+
+        // Marcar sesión como activa
+        localStorage.setItem('next_session', 'true')
+
+        // Login exitoso → si ya completó el onboarding va al dashboard, si no al onboarding
+        const profile = JSON.parse(localStorage.getItem('next_profile') || 'null')
+        navigate(profile ? '/dashboard' : '/onboarding', { replace: true })
+    }
+
     return (
-        <div className='flex flex-col-reverse sm:flex-row h-screen w-full relative'>
-            {/* Logo mobile */}
-            <div className='sm:hidden absolute top-6 left-6 z-10'>
+        <div className="flex flex-col-reverse sm:flex-row h-screen w-full relative overflow-hidden">
+
+            {/* ── Logo mobile ─────────────────────────────────── */}
+            <div className="sm:hidden absolute top-6 left-6 z-10">
                 <LogoNext />
             </div>
 
-            {/* Sección del formulario */}
-            <div className='bg-white flex-1 sm:flex-none sm:w-[45%] lg:w-[45%] xl:w-[40%] h-screen flex items-center justify-center sm:bg-[#31445E] sm:bg-[radial-gradient(circle,#69809E_0%,#31445E_100%)] sm:shadow-[5px_0_10px_3px_rgba(0,0,0,0.3)] py-8 px-5'>
-                <div className='bg-white py-10 px-8 sm:px-10 md:px-14 rounded-2xl text-center flex flex-col gap-y-6 w-full max-w-md'>
-                    <h2 className='text-2xl font-bold'>Bienvenido</h2>
-                    <hr className='text-gray-300' />
-                    <form action="" aria-label="Formulario de inicio de sesión">
-                        <div className='flex flex-col gap-1'>
+            {/* ═══════════════════════════════════════════════════
+                PANEL IZQUIERDO — Formulario
+            ══════════════════════════════════════════════════════ */}
+            <aside
+                aria-label="Panel de inicio de sesión"
+                className="
+                    bg-white flex-1 sm:flex-none
+                    sm:w-[45%] lg:w-[42%] xl:w-[38%]
+                    h-screen flex items-center justify-center
+                    sm:bg-[#31445E] sm:bg-[radial-gradient(circle,#69809E_0%,#31445E_100%)]
+                    sm:shadow-[5px_0_30px_rgba(0,0,0,0.25)]
+                    py-8 px-5 relative
+                "
+            >
+                {/* Elementos decorativos de profundidad — solo desktop */}
+                <div className="hidden sm:block absolute top-16 -right-16 w-56 h-56 rounded-full bg-white/5 blur-3xl pointer-events-none" />
+                <div className="hidden sm:block absolute bottom-20 -left-12 w-40 h-40 rounded-full bg-[#2563EB]/10 blur-2xl pointer-events-none" />
+
+                {/* Tarjeta del formulario */}
+                <div className="
+                    bg-white py-10 px-8 sm:px-10 md:px-12
+                    rounded-2xl text-center
+                    flex flex-col gap-y-5
+                    w-full max-w-md
+                    shadow-[0_4px_24px_rgba(0,0,0,0.06)]
+                    animate-fade-in-up
+                ">
+                    <div>
+                        <h2 className="text-2xl font-bold text-gray-900">Bienvenido de vuelta</h2>
+                        <p className="text-gray-400 text-sm mt-1">Inicia sesión para continuar tu ruta</p>
+                    </div>
+
+                    <hr className="border-gray-100" />
+
+                    <form
+                        onSubmit={handleSubmit}
+                        noValidate
+                        aria-label="Formulario de inicio de sesión"
+                    >
+                        {/* Error global (credenciales incorrectas) */}
+                        {errores.global && (
+                            <div
+                                role="alert"
+                                className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3.5 py-3 mb-3 text-left animate-fade-in"
+                            >
+                                <AlertCircle size={15} className="text-red-400 flex-shrink-0 mt-0.5" />
+                                <p className="text-red-600 text-sm">{errores.global}</p>
+                            </div>
+                        )}
+
+                        <div className="flex flex-col gap-0.5">
                             <InputField
                                 type="email"
-                                placeholder="Correo Electronico"
+                                placeholder="Correo electrónico"
                                 Icono={Mail}
-                                name="email"              
+                                name="email"
                                 value={formData.email}
                                 onChange={handleChange}
+                                error={errores.email}
+                                autoComplete="email"
+                                maxLength={254}
+                                required
                             />
                             <InputField
                                 type="password"
@@ -47,32 +156,73 @@ const Login = () => {
                                 name="password"
                                 value={formData.password}
                                 onChange={handleChange}
+                                error={errores.password}
+                                autoComplete="current-password"
+                                maxLength={128}
+                                required
                             />
                         </div>
-                        <div className='flex items-center gap-2 mb-5'>
-                            <input type="checkbox" id="remember" className='cursor-pointer' />
-                            <label htmlFor="remember" className='opacity-80 text-sm cursor-pointer'>Recordarme</label>
-                        </div>
-                        <Button text='Iniciar sesion' />
-                    </form>
-                    <p className='text-xs sm:text-sm'>¿Olvidaste tu contraseña?</p>
-                    <p className='text-xs sm:text-sm'>¿No tienes cuenta? <span className='font-bold text-next-primary cursor-pointer'>Crear una</span></p>
-                </div>
-            </div>
 
-            {/* Sección de imagen/hero - oculta en mobile */}
-            <div className='hidden sm:flex flex-1 flex-col h-screen text-center px-8 py-8'>
-                <div className='mb-auto'>
+                        <div className="flex items-center justify-between mt-2 mb-5">
+                            <label className="flex items-center gap-2 cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    id="remember"
+                                    className="w-4 h-4 accent-[#2563EB] cursor-pointer"
+                                />
+                                <span className="text-gray-500 text-sm select-none">Recordarme</span>
+                            </label>
+                            <button
+                                type="button"
+                                className="text-[#2563EB] text-sm font-medium hover:underline cursor-pointer"
+                            >
+                                ¿Olvidaste tu contraseña?
+                            </button>
+                        </div>
+
+                        <Button
+                            text="Iniciar sesión"
+                            type="submit"
+                            loading={isLoading}
+                        />
+                    </form>
+
+                    <p className="text-sm text-gray-500">
+                        ¿No tienes cuenta?{' '}
+                        <Link to="/signin" className="font-semibold text-[#2563EB] hover:underline">
+                            Crear una gratis
+                        </Link>
+                    </p>
+                </div>
+            </aside>
+
+            {/* ═══════════════════════════════════════════════════
+                PANEL DERECHO — Hero (solo desktop)
+            ══════════════════════════════════════════════════════ */}
+            <section
+                aria-label="Sección informativa"
+                className="hidden sm:flex flex-1 flex-col h-screen text-center px-8 py-8"
+            >
+                <div className="mb-auto">
                     <LogoNext />
                 </div>
-                <div className='flex flex-col items-center justify-center gap-4 flex-1'>
-                    <h1 className='text-3xl lg:text-4xl font-bold text-pretty px-4'>
+
+                <div className="flex flex-col items-center justify-center gap-6 flex-1">
+                    <h1 className="text-3xl lg:text-4xl xl:text-5xl font-bold text-gray-900 text-pretty px-4 leading-snug">
                         Conecta tu talento <br />
-                        <span className='font-medium'>con tu <span className='text-next-primary'>proximo</span> <span className='text-[#4ADE80]'>empleo</span></span>
+                        <span className="font-medium text-gray-600">
+                            con tu{' '}
+                            <span className="text-[#2563EB]">próximo</span>{' '}
+                            <span className="text-[#4ADE80]">empleo</span>
+                        </span>
                     </h1>
-                    <img src={LoginJobImg} alt="Persona buscando empleo" className='w-full max-w-80 lg:max-w-120 xl:max-w-150' />
+                    <img
+                        src={LoginJobImg}
+                        alt="Persona buscando empleo"
+                        className="w-full max-w-72 lg:max-w-[26rem] xl:max-w-[30rem] drop-shadow-sm"
+                    />
                 </div>
-            </div>
+            </section>
         </div>
     )
 }
