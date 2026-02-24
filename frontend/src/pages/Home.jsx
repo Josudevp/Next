@@ -25,10 +25,10 @@ const Home = () => {
             </nav>
 
             {/* Hero Section */}
-            <div className='flex flex-col md:flex-row md:items-center md:justify-between gap-8 md:gap-12 max-w-7xl mx-auto w-full flex-1'>
+            <div className='flex flex-col md:flex-row md:items-center md:justify-center md:justify-between gap-6 md:gap-12 max-w-7xl mx-auto w-full flex-1 justify-center'>
                 
                 {/* Content Section */}
-                <section className='flex flex-col gap-6 md:w-1/2 md:gap-8 md:pt-12'>
+                <section className='flex flex-col gap-6 md:w-1/2 md:gap-8'>
                     {/* Main Heading and Description */}
                     <div className='flex flex-col gap-4 md:gap-6'>
                         <h1 className='text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-center md:text-left leading-tight text-pretty'>
@@ -42,9 +42,9 @@ const Home = () => {
                 </section>
                 
                 {/* Interactive Section */}
-                <section className='flex flex-col items-center gap-6 md:gap-8 md:w-1/2'>
-                    {/* 3D Robot */}
-                    <div className='w-full flex justify-center'>
+                <section className='flex flex-col items-center gap-4 md:gap-8 md:w-1/2'>
+                    {/* 3D Robot - Hidden on mobile */}
+                    <div className='hidden md:flex w-full justify-center'>
                         <Robot3D />
                     </div>
                     
