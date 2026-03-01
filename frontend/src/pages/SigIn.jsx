@@ -144,7 +144,7 @@ const SigIn = () => {
                     <img
                         src={SigInImage}
                         alt="Persona registrándose para buscar empleo"
-                        className="w-full max-w-72 lg:max-w-[26rem] xl:max-w-[30rem] drop-shadow-sm"
+                        className="w-full max-w-72 lg:max-w-104 xl:max-w-120 drop-shadow-sm"
                     />
                 </div>
             </section>
@@ -166,7 +166,7 @@ const SigIn = () => {
             >
                 {/* Elementos decorativos — solo desktop */}
                 <div className="hidden sm:block absolute bottom-16 -right-14 w-48 h-48 rounded-full bg-white/5 blur-3xl pointer-events-none" />
-                <div className="hidden sm:block absolute top-20  -left-10  w-36 h-36 rounded-full bg-[#2563EB]/10 blur-2xl pointer-events-none" />
+                <div className="hidden sm:block absolute top-20  -left-10  w-36 h-36 rounded-full bg-primary/10 blur-2xl pointer-events-none" />
 
                 {/* Tarjeta del formulario */}
                 <div className="
@@ -263,7 +263,7 @@ const SigIn = () => {
 
                     <p className="text-sm text-gray-500">
                         ¿Ya tienes cuenta?{' '}
-                        <Link to="/login" className="font-semibold text-[#2563EB] hover:underline">
+                        <Link to="/login" className="font-semibold text-next-primary hover:underline">
                             Iniciar sesión
                         </Link>
                     </p>
