@@ -2,27 +2,14 @@ import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import {
   Bell, ChevronRight, Lightbulb, Bot,
-  Briefcase, TrendingUp, RefreshCw, LogOut
+  Briefcase, TrendingUp, RefreshCw, LogOut, User as UserIcon, Settings, HelpCircle
 } from 'lucide-react'
 import LogoNext from '../components/LogoNext'
+import ProfileEdit from '../components/ProfileEdit'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Cálculo del Score de Empleabilidad
-// Para el backend: GET /api/users/score → devuelve { score, breakdown }
+// (El Score ahora se consume enteramente desde MySQL backend)
 // ─────────────────────────────────────────────────────────────────────────────
-const calculateScore = (profile) => {
-  if (!profile) return 0
-
-  const situationBonus = { studying: 5, graduating: 10, graduated: 15, searching: 20 }
-  const base = 35
-  const skillPts = Math.min(profile.skills.length * 5, 35)
-  const sitPts = situationBonus[profile.situation] || 5
-  const goalPts = Math.min((profile.goals?.length || 0) * 2, 10)
-
-  return Math.min(base + skillPts + sitPts + goalPts, 95)
-}
-
-// ─── Progreso circular SVG ────────────────────────────────────────────────────
 const CircularProgress = ({ percentage }) => {
   const r = 44
   const circ = 2 * Math.PI * r
@@ -64,7 +51,7 @@ const CircularProgress = ({ percentage }) => {
 }
 
 // ─── Avatar con iniciales ─────────────────────────────────────────────────────
-const UserAvatar = ({ name, onLogout }) => {
+const UserAvatar = ({ name, onLogout, onEditProfile }) => {
   const [open, setOpen] = useState(false)
   const initials = name
     .split(' ')
@@ -84,11 +71,22 @@ const UserAvatar = ({ name, onLogout }) => {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-11 bg-white border border-gray-100 rounded-2xl shadow-xl shadow-gray-200/60 py-2 w-44 z-50 animate-fade-in">
-          <p className="px-4 py-2 text-xs text-gray-400 font-medium border-b border-gray-100 mb-1 truncate">{name}</p>
+        <div className="absolute right-0 top-11 bg-white border border-gray-100 rounded-2xl shadow-xl shadow-gray-200/60 py-2 w-48 z-50 animate-fade-in">
+          <div className="px-4 py-2 border-b border-gray-50 mb-1">
+            <p className="text-xs text-gray-400 font-medium truncate">Sesión de</p>
+            <p className="text-sm text-gray-800 font-bold truncate">{name}</p>
+          </div>
+
+          <button
+            onClick={() => { onEditProfile(); setOpen(false); }}
+            className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-colors cursor-pointer"
+          >
+            <UserIcon size={14} /> Mi Perfil
+          </button>
+
           <button
             onClick={onLogout}
-            className="flex items-center gap-2 w-full px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors cursor-pointer"
+            className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors cursor-pointer border-t border-gray-50 mt-1"
           >
             <LogOut size={14} /> Cerrar sesión
           </button>
@@ -121,34 +119,79 @@ const Dashboard = () => {
   const [profile, setProfile] = useState(null)
   const [score, setScore] = useState(0)
   const [animatedScore, setAnimatedScore] = useState(0)
+  const [isEditingProfile, setIsEditingProfile] = useState(false)
 
-  // ── Auth guard + carga de datos ───────────────────────────────────────────
-  // Para el backend: verificar JWT / session token con GET /api/auth/me
+  // ── Auth guard + carga de datos remotos ──────────────────────────────────
   useEffect(() => {
-    const session = localStorage.getItem('next_session')               // ¿hay sesión activa?
-    const storedUser = JSON.parse(localStorage.getItem('next_user') || 'null')
-    const storedProfile = JSON.parse(localStorage.getItem('next_profile') || 'null')
+    const checkAuthAndFetchProfile = async () => {
+      const session = localStorage.getItem('next_session')
+      const token = localStorage.getItem('next_token')
+      const storedUser = JSON.parse(localStorage.getItem('next_user') || 'null')
 
-    if (!session || !storedUser) { navigate('/login', { replace: true }); return }
-    if (!storedProfile) { navigate('/onboarding', { replace: true }); return }
+      if (!session || !token || !storedUser) {
+        navigate('/login', { replace: true })
+        return
+      }
 
-    setUser(storedUser)
-    setProfile(storedProfile)
+      setUser(storedUser)
 
-    const calculatedScore = calculateScore(storedProfile)
-    setScore(calculatedScore)
+      try {
+        // Obtenemos los datos directos desde MySQL
+        const res = await fetch('http://localhost:5000/api/user/profile', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
 
-    // Anima el número del score al montar
-    let count = 0
-    const step = Math.ceil(calculatedScore / 40)
+        if (!res.ok) throw new Error('Error al cargar perfil desde servidor')
+
+        const dbProfile = await res.json()
+        setProfile(dbProfile)
+        setScore(dbProfile.score || 0)
+
+      } catch (error) {
+        console.error('Error fetching DB profile, usando fallback', error)
+        // Fallback a onboarding si falla y no hay local fallback (o si quieres forzar al login)
+        const fallbackProfile = JSON.parse(localStorage.getItem('next_profile') || 'null')
+        if (!fallbackProfile) {
+          navigate('/onboarding', { replace: true })
+        } else {
+          setProfile(fallbackProfile)
+        }
+      }
+    }
+
+    checkAuthAndFetchProfile()
+  }, [navigate])
+
+  // ── Animación dinámica del score (tanto al subir como al bajar) ──────────
+  useEffect(() => {
+    // Almacenamos el valor actual en este render específico
+    let currentVal = animatedScore
+    const targetVal = score
+
+    if (currentVal === targetVal) return
+
     const timer = setInterval(() => {
-      count = Math.min(count + step, calculatedScore)
-      setAnimatedScore(count)
-      if (count >= calculatedScore) clearInterval(timer)
-    }, 30)
+      if (currentVal === targetVal) {
+        clearInterval(timer)
+        return
+      }
+
+      const diff = targetVal - currentVal
+      // Paso adaptativo: avanza rápido si está lejos, y de a 1 si está cerca
+      const step = Math.max(1, Math.floor(Math.abs(diff) / 10))
+
+      currentVal = diff > 0
+        ? Math.min(currentVal + step, targetVal)
+        : Math.max(currentVal - step, targetVal)
+
+      setAnimatedScore(currentVal)
+    }, 25)
 
     return () => clearInterval(timer)
-  }, [navigate])
+    // Se ignora 'animatedScore' en las dependencias intencionalmente para 
+    // que solo reinicie el trigger al cambiar el 'score' final.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [score])
 
   const handleLogout = () => {
     // Para el backend: DELETE /api/auth/session (invalidar JWT)
@@ -172,9 +215,10 @@ const Dashboard = () => {
     )
   }
 
-  const firstName = user.name.split(' ')[0]
-  const weeklySkill = profile.skills[0] || 'Comunicación efectiva'
-  const skillBoost = Math.max(4, Math.min(8, 15 - profile.skills.length))
+  const firstName = user.name ? user.name.split(' ')[0] : 'Usuario'
+  const skillsArray = profile?.skills || []
+  const weeklySkill = skillsArray[0] || 'Comunicación efectiva'
+  const skillBoost = Math.max(4, Math.min(8, 15 - skillsArray.length))
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
@@ -195,7 +239,11 @@ const Dashboard = () => {
               <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#2563EB] rounded-full ring-2 ring-white" />
             </button>
 
-            <UserAvatar name={user.name} onLogout={handleLogout} />
+            <UserAvatar
+              name={user.name}
+              onLogout={handleLogout}
+              onEditProfile={() => setIsEditingProfile(!isEditingProfile)}
+            />
           </div>
         </div>
       </nav>
@@ -205,19 +253,45 @@ const Dashboard = () => {
             ════════════════════════════════════════════════════ */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6">
 
+        {/* ── SECCIÓN DE EDICIÓN DE PERFIL (Toggleable) ── */}
+        {isEditingProfile && (
+          <section className="animate-fade-in-up mb-10 overflow-hidden">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+                <Settings size={20} className="text-blue-600" /> Configuración de Perfil
+              </h3>
+              <button
+                onClick={() => setIsEditingProfile(false)}
+                className="text-sm text-gray-400 hover:text-gray-600 font-medium cursor-pointer"
+              >
+                Cerrar editor
+              </button>
+            </div>
+            <ProfileEdit onProfileUpdated={(updatedUser) => {
+              setProfile(updatedUser);
+              setScore(updatedUser.score);
+              // Actualizamos también el localStorage para persistencia visual inmediata
+              localStorage.setItem('next_user', JSON.stringify({
+                name: updatedUser.name,
+                email: updatedUser.email
+              }));
+            }} />
+          </section>
+        )}
+
         {/* ── SALUDO ──────────────────────────────────── */}
         <section className="animate-fade-in-up">
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
             Hola, {firstName} 👋
           </h1>
           <p className="text-gray-400 mt-1 text-sm sm:text-base">
-            {profile.areaLabel} · {profile.situationLabel}
+            {profile.area || profile.jobType || 'Área no definida'}
           </p>
 
           {/* Tags de habilidades seleccionadas */}
-          {profile.skills.length > 0 && (
+          {skillsArray.length > 0 && (
             <div className="flex flex-wrap gap-2 mt-3">
-              {profile.skills.slice(0, 6).map(skill => (
+              {skillsArray.slice(0, 6).map(skill => (
                 <span
                   key={skill}
                   className="px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-[#2563EB] border border-blue-100"
@@ -225,9 +299,9 @@ const Dashboard = () => {
                   {skill}
                 </span>
               ))}
-              {profile.skills.length > 6 && (
+              {skillsArray.length > 6 && (
                 <span className="px-3 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-500">
-                  +{profile.skills.length - 6} más
+                  +{skillsArray.length - 6} más
                 </span>
               )}
             </div>
@@ -251,7 +325,7 @@ const Dashboard = () => {
               <div>
                 <p className="text-sm text-gray-500 leading-relaxed">
                   Basado en tu perfil,{' '}
-                  <span className="font-semibold text-gray-700">{profile.skills.length} habilidades</span>{' '}
+                  <span className="font-semibold text-gray-700">{profile.skills?.length || 0} habilidades</span>{' '}
                   y tus metas laborales.
                 </p>
                 <div className="flex items-center gap-1.5 mt-3">

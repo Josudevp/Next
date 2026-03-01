@@ -90,29 +90,48 @@ const SigIn = () => {
         return errs
     }
 
-    // ✅ Guardado en localStorage + navegación
-    // Para el backend: reemplazar con → const res = await fetch('/api/auth/register', { method: 'POST', body: JSON.stringify({name, email, password}) })
     const handleSubmit = async (e) => {
         e.preventDefault()
         const errs = validate()
         if (Object.keys(errs).length > 0) { setErrores(errs); return }
 
         setIsLoading(true)
+        setErrores({})
 
-        // Simula latencia de red
-        await new Promise(r => setTimeout(r, 700))
+        try {
+            const name = sanitize(formData.name)
+            const email = sanitize(formData.email)
+            const password = formData.password
 
-        // ✅ Solo guardamos datos NO sensibles — nunca la contraseña
-        const userData = {
-            name: sanitize(formData.name),
-            email: sanitize(formData.email).toLowerCase(),
+            const response = await fetch('http://localhost:5000/api/auth/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ name, email, password })
+            })
+
+            const data = await response.json()
+
+            if (!response.ok) {
+                // Manejar errores (ej. 400 - correo ya en uso)
+                setErrores({ global: data.mensaje || 'Error al registrar usuario' })
+                return
+            }
+
+            // Éxito
+            localStorage.setItem('next_token', data.token)
+            localStorage.setItem('next_user', JSON.stringify(data.user))
+            localStorage.setItem('next_session', 'true')
+
+            // Redirigir al dashboard
+            navigate('/dashboard', { replace: true })
+        } catch (error) {
+            console.error('Error en registro:', error)
+            setErrores({ global: 'Error de conexión con el servidor.' })
+        } finally {
+            setIsLoading(false)
         }
-        localStorage.setItem('next_user', JSON.stringify(userData))
-
-        // Marcar sesión como activa
-        localStorage.setItem('next_session', 'true')
-
-        navigate('/onboarding', { replace: true })
     }
 
     return (
@@ -189,6 +208,17 @@ const SigIn = () => {
                         noValidate
                         aria-label="Formulario de registro"
                     >
+                        {/* Error global (ej. correo ya en uso) */}
+                        {errores.global && (
+                            <div
+                                role="alert"
+                                className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3.5 py-3 mb-3 text-left animate-fade-in"
+                            >
+                                <AlertCircle size={15} className="text-red-400 flex-shrink-0 mt-0.5" />
+                                <p className="text-red-600 text-sm">{errores.global}</p>
+                            </div>
+                        )}
+
                         <InputField
                             type="text"
                             placeholder="Nombre completo"

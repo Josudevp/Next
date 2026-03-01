@@ -1,12 +1,12 @@
-const express = require('express');
-const router = express.Router(); // Usamos el enrutador de Express
-const authController = require('../controllers/authController'); // Importamos la lógica
+import express from 'express';
+import { register, login } from '../controllers/authController.js';
 
-// Ruta para registrarse: POST /api/auth/register
-// Cuando alguien haga POST aquí, se ejecuta la función 'register' del controlador
-router.post('/register', authController.register);
+const router = express.Router();
 
-// Ruta para iniciar sesión: POST /api/auth/login
-router.post('/login', authController.login);
+// Ruta: POST /api/auth/register
+router.post('/register', register);
 
-module.exports = router;
+// Ruta: POST /api/auth/login
+router.post('/login', login);
+
+export default router;

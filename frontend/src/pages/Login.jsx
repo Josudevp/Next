@@ -41,41 +41,47 @@ const Login = () => {
         return errs
     }
 
-    // ✅ Verificación contra localStorage + navegación
-    // Para el backend: reemplazar con → const res = await fetch('/api/auth/login', { method: 'POST', body: JSON.stringify({email, password}) })
     const handleSubmit = async (e) => {
         e.preventDefault()
         const errs = validate()
         if (Object.keys(errs).length > 0) { setErrores(errs); return }
 
         setIsLoading(true)
+        setErrores({}) // Limpiar errores previos
 
-        // Simula latencia de red para que la UI no se sienta brusca
-        await new Promise(r => setTimeout(r, 600))
+        try {
+            const email = sanitize(formData.email)
+            const password = formData.password
 
-        const raw = localStorage.getItem('next_user')
-        const email = sanitize(formData.email)
+            const response = await fetch('http://localhost:5000/api/auth/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ email, password })
+            })
 
-        if (!raw) {
-            setErrores({ global: 'No encontramos esa cuenta. ¿Ya te registraste?' })
+            const data = await response.json()
+
+            if (!response.ok) {
+                // Manejar errores (ej. 401, 404)
+                setErrores({ global: data.mensaje || 'Error al iniciar sesión' })
+                return
+            }
+
+            // Éxito
+            localStorage.setItem('next_token', data.token)
+            localStorage.setItem('next_user', JSON.stringify(data.user))
+            localStorage.setItem('next_session', 'true')
+
+            // Redirigir al dashboard
+            navigate('/dashboard', { replace: true })
+        } catch (error) {
+            console.error('Error en login:', error)
+            setErrores({ global: 'Error de conexión con el servidor.' })
+        } finally {
             setIsLoading(false)
-            return
         }
-
-        const user = JSON.parse(raw)
-
-        if (user.email.toLowerCase() !== email.toLowerCase()) {
-            setErrores({ global: 'Correo o contraseña incorrectos.' })
-            setIsLoading(false)
-            return
-        }
-
-        // Marcar sesión como activa
-        localStorage.setItem('next_session', 'true')
-
-        // Login exitoso → si ya completó el onboarding va al dashboard, si no al onboarding
-        const profile = JSON.parse(localStorage.getItem('next_profile') || 'null')
-        navigate(profile ? '/dashboard' : '/onboarding', { replace: true })
     }
 
     return (
