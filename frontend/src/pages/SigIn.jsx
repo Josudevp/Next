@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Mail, Lock, UserRound, AlertCircle, CheckCircle2 } from 'lucide-react'
+import API_URL from '../api/api'
 import Button from '../components/Button'
 import InputField from '../components/InputField'
 import SigInImage from '../assets/SigIn/signUpJob.webp'
@@ -103,7 +104,7 @@ const SigIn = () => {
             const email = sanitize(formData.email)
             const password = formData.password
 
-            const response = await fetch('http://localhost:5000/api/auth/register', {
+            const response = await fetch(`${API_URL}/auth/register`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
+import API_URL from '../api/api'
 import {
   Bell, ChevronRight, Lightbulb, Bot,
   Briefcase, TrendingUp, RefreshCw, LogOut, User as UserIcon, Settings, HelpCircle
@@ -137,7 +138,7 @@ const Dashboard = () => {
 
       try {
         // Obtenemos los datos directos desde MySQL
-        const res = await fetch('http://localhost:5000/api/user/profile', {
+        const res = await fetch(`${API_URL}/user/profile`, {
           headers: { 'Authorization': `Bearer ${token}` }
         })
 

@@ -1,7 +1,13 @@
 import axios from 'axios';
 
+// En producción (Render): VITE_API_URL = https://next-backend.onrender.com
+// En local (XAMPP): el proxy de vite.config.js redirige /api → localhost:5000
+const API_BASE = import.meta.env.VITE_API_URL
+    ? `${import.meta.env.VITE_API_URL}/api`
+    : '/api';
+
 const axiosInstance = axios.create({
-    baseURL: 'http://localhost:5000/api',
+    baseURL: API_BASE,
     timeout: 30000,
     headers: { 'Content-Type': 'application/json' },
 });
