@@ -1,16 +1,20 @@
 import { lazy, Suspense, Component, useRef, useState, useEffect } from 'react';
 import '../App.css';
 
-// ── Carga DIFERIDA del módulo Spline ────────────────────────────────────────
-// React.lazy() hace que el bundle de Three.js / @splinetool/runtime
-// se descargue solo cuando este componente se monta (code splitting).
-// Así, si falla, NO crashea el resto de la app.
 const Spline = lazy(() => import('@splinetool/react-spline'));
 
-// ── Error Boundary ──────────────────────────────────────────────────────────
-// React solo puede capturar errores de renderizado síncronos con class components.
-// Si Spline lanza "Error creating WebGL context", este boundary lo atrapa y
-// muestra un fallback elegante en lugar de propagar el error hacia arriba.
+// ── Comprobación nativa de WebGL ────────────────────────────────────────────
+function isWebGLAvailable() {
+  try {
+    const canvas = document.createElement('canvas');
+    return !!(window.WebGLRenderingContext &&
+      (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')));
+  } catch (e) {
+    return false;
+  }
+}
+
+// ── Error Boundary local ────────────────────────────────────────────────────
 class SplineErrorBoundary extends Component {
   constructor(props) {
     super(props);
@@ -21,87 +25,100 @@ class SplineErrorBoundary extends Component {
     return { hasError: true };
   }
 
-  componentDidCatch(error, info) {
-    // Log silencioso — no queremos que el error rompa nada más
-    console.warn('[Robot3D] Spline/WebGL no disponible en este entorno:', error.message, info);
+  componentDidCatch(error) {
+    console.warn('[Robot3D] Fallo crítico de WebGL:', error.message);
   }
 
   render() {
     if (this.state.hasError) {
-      // Fallback: placeholder visual que mantiene la estética del panel
-      return (
-        <div className="w-full h-full flex flex-col items-center justify-center gap-4 opacity-40">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="80"
-            height="80"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="white"
-            strokeWidth="1"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <circle cx="12" cy="8" r="4" />
-            <path d="M8 8v1a4 4 0 0 0 8 0V8" />
-            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
-          </svg>
-          <p className="text-white text-xs tracking-widest uppercase">IA Coach</p>
-        </div>
-      );
+      return <FallbackUI />;
     }
     return this.props.children;
   }
 }
 
+// ── UI de Respaldo cuando no hay 3D ─────────────────────────────────────────
+const FallbackUI = () => (
+  <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-[#F8FAFC] rounded-3xl border border-gray-200 shadow-inner px-6 text-center">
+    <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center">
+      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 8V4H8" />
+        <rect width="16" height="12" x="4" y="8" rx="2" />
+        <path d="M2 14h2" />
+        <path d="M20 14h2" />
+        <path d="M15 13v2" />
+        <path d="M9 13v2" />
+      </svg>
+    </div>
+    <div>
+      <h3 className="text-gray-900 font-bold text-lg">IA Coach 3D</h3>
+      <p className="text-sm text-gray-500 max-w-[250px] mt-1">
+        La aceleración gráfica (WebGL) de tu navegador está desactivada. Actívala para ver el simulador 3D.
+      </p>
+    </div>
+  </div>
+);
+
 // ── Componente principal ────────────────────────────────────────────────────
 export default function Robot3D() {
   const containerRef = useRef(null);
   const [canRender, setCanRender] = useState(false);
+  const [hasWebGL, setHasWebGL] = useState(true);
 
-  // Solo monta Spline cuando el contenedor tiene dimensiones positivas.
-  // Previene el error WebGL "zero size framebuffer" en display:none o en SSR.
   useEffect(() => {
+    // 1. Verificamos soporte a nivel de hardware/browser
+    if (!isWebGLAvailable()) {
+      setHasWebGL(false);
+      return;
+    }
+
+    // 2. Control de renderizado para evitar errores si no hay tamaño
+    const el = containerRef.current;
+    if (!el) return;
+
+    const { width, height } = el.getBoundingClientRect();
+    if (width > 0 && height > 0) {
+      setCanRender(true);
+      return;
+    }
+
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        const { width, height } = entry.contentRect;
-        if (width > 0 && height > 0) {
+        if (entry.contentRect.width > 0 && entry.contentRect.height > 0) {
           setCanRender(true);
           observer.disconnect();
+          return;
         }
       }
     });
 
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
-    }
-
+    observer.observe(el);
     return () => observer.disconnect();
   }, []);
 
+  // Si no hay WebGL, ni siquiera intentamos montar Spline
+  if (!hasWebGL) {
+    return (
+      <div className="w-full h-[400px] flex justify-center items-center p-4">
+        <FallbackUI />
+      </div>
+    );
+  }
+
   return (
-    <div
-      ref={containerRef}
-      className="w-full h-full min-h-[500px] flex justify-center items-center relative overflow-hidden"
-    >
+    <div ref={containerRef} className="w-full h-full min-h-[500px] flex justify-center items-center relative overflow-hidden">
       {canRender && (
         <div className="w-full h-[120%] absolute -top-[5%]">
-          {/* SplineErrorBoundary captura errores de WebGL / Three.js */}
           <SplineErrorBoundary>
-            {/* Suspense muestra un loader mientras se descarga el bundle de Spline */}
-            <Suspense
-              fallback={
-                <div className="w-full h-full flex items-center justify-center">
-                  <div className="w-8 h-8 border-2 border-white/20 border-t-white/80 rounded-full animate-spin" />
-                </div>
-              }
-            >
+            <Suspense fallback={
+              <div className="w-full h-full flex flex-col items-center justify-center gap-3">
+                <div className="w-8 h-8 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
+                <span className="text-sm text-blue-500/60 font-medium">Cargando 3D...</span>
+              </div>
+            }>
               <Spline
                 scene="https://prod.spline.design/9dHbiIYbbd-WCjPU/scene.splinecode"
-                onError={(e) => {
-                  // onError de Spline: errores de red o de carga del .splinecode
-                  console.warn('[Robot3D] Error cargando escena Spline:', e);
-                }}
+                onError={(e) => console.warn('[Robot3D] Error de carga Spline:', e)}
               />
             </Suspense>
           </SplineErrorBoundary>
