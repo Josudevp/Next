@@ -56,9 +56,8 @@ services:
   # ──────────────────────────────────────────────────────────────
   # 2. FRONTEND — Static Site (React / Vite)
   # ──────────────────────────────────────────────────────────────
-  - type: static
+  - type: static_site
     name: next-frontend
-    runtime: static
 
     rootDir: frontend
 
@@ -79,4 +78,4 @@ services:
       # Vite la inyecta en build time como import.meta.env.VITE_API_URL.
       # El frontend la usa en src/api/api.js y src/api/axiosInstance.js.
       - key: VITE_API_URL
-        value: https://next-ryjd.onrender.com
+        value: https://next-ryjd.onrender.com/api
