@@ -364,7 +364,7 @@ const Onboarding = () => {
         <LogoNext />
       </header>
 
-      {/* Barra de progreso */} 
+      {/* Barra de progreso */}  
       <TopBar step={step} total={TOTAL_STEPS} />
 
       {/* Contenido del paso actual */}

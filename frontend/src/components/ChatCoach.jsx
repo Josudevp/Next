@@ -4,6 +4,7 @@ import ReactMarkdown from 'react-markdown';
 import { useNavigate } from 'react-router-dom';
 import LogoNext from '../components/LogoNext';
 import Robot3D from '../components/Robot3D';
+import axiosInstance from '../api/axiosInstance';
 
 const ChatCoach = () => {
     const navigate = useNavigate();
@@ -27,6 +28,8 @@ const ChatCoach = () => {
     const recognitionRef = useRef(null);
     const isInterviewModeRef = useRef(isInterviewMode);
     const sendMessageRef = useRef(null);
+    const silenceTimerRef = useRef(null);
+    const prevInputRef = useRef('');
 
     // Actualizar referencias en cada render para prevenir stale closures en eventos
     isInterviewModeRef.current = isInterviewMode;
@@ -45,30 +48,51 @@ const ChatCoach = () => {
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         if (SpeechRecognition) {
             recognitionRef.current = new SpeechRecognition();
-            recognitionRef.current.continuous = false;
+            recognitionRef.current.continuous = true;
             recognitionRef.current.lang = 'es-ES';
-            recognitionRef.current.interimResults = false;
+            recognitionRef.current.interimResults = true;
 
             recognitionRef.current.onresult = (event) => {
-                const transcript = event.results[0][0].transcript;
-                setIsListening(false);
+                // Acumulador temporal para toda la sesión actual de voz
+                const sessionTranscript = Array.from(event.results)
+                    .map(result => result[0].transcript)
+                    .join('');
 
-                if (isInterviewModeRef.current && sendMessageRef.current) {
-                    // Modo simulación: auto-enviar directamente y no esperar al botón
-                    sendMessageRef.current(null, transcript);
+                // 1. Mostrar texto acumulado en tiempo real en UI
+                if (isInterviewModeRef.current) {
+                    setInput(sessionTranscript);
                 } else {
-                    // Modo chat normal: simplemente se coloca en el input de texto
-                    setInput(prev => (prev ? prev + ' ' : '') + transcript);
+                    setInput((prevInputRef.current ? prevInputRef.current + ' ' : '') + sessionTranscript);
                 }
+
+                // 2. Limpiar timer anterior (Debounce)
+                if (silenceTimerRef.current) {
+                    clearTimeout(silenceTimerRef.current);
+                }
+
+                // 3. Iniciar nuevo timer de paciencia (2000ms de silencio)
+                silenceTimerRef.current = setTimeout(() => {
+                    const textToSend = sessionTranscript.trim();
+                    if (isInterviewModeRef.current && sendMessageRef.current && textToSend) {
+                        sendMessageRef.current(null, textToSend);
+                        setInput('');
+                        recognitionRef.current?.stop();
+                    } else if (!isInterviewModeRef.current) {
+                        // En chat normal, detener escucha y dejar texto listo para enviar
+                        recognitionRef.current?.stop();
+                    }
+                }, 2000);
             };
 
             recognitionRef.current.onerror = (event) => {
                 console.error("Error en Speech recognition: ", event.error);
                 setIsListening(false);
+                if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
             };
 
             recognitionRef.current.onend = () => {
                 setIsListening(false);
+                if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
             };
         } else {
             console.warn("Speech Recognition API no soportada en este navegador.");
@@ -79,6 +103,7 @@ const ChatCoach = () => {
         if (isListening) {
             recognitionRef.current?.stop();
             setIsListening(false);
+            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
         } else {
             // Empezar a escuchar (O intentarlo solicitando permisos si es la primera vez)
             try {
@@ -88,6 +113,7 @@ const ChatCoach = () => {
 
                 // Pedir permiso explícitamente vía web navigator para asegurar UI si no se han resuelto
                 navigator.mediaDevices.getUserMedia({ audio: true }).then(() => {
+                    prevInputRef.current = input; // Guardamos lo que ya se había escrito
                     recognitionRef.current?.start();
                     setIsListening(true);
                 }).catch(err => {
@@ -142,33 +168,15 @@ const ChatCoach = () => {
         setIsTyping(true);
 
         try {
-            const token = localStorage.getItem('next_token') || '';
-
-            // Si estamos en modo entrevista, pre-envolvemos el prompt furtivamente 
-            // para que Gemini asuma el rol antes de procesar el texto del usuario
-            let finalPrompt = textToSend;
-
             const requestBody = {
-                message: finalPrompt,
+                message: textToSend,
                 history: messages.filter(m => m.id !== 'init' && !m.isError),
                 isInterviewMode
             };
 
-            const response = await fetch('http://localhost:5000/api/coach/chat', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(requestBody),
-            });
-
-            if (!response.ok) {
-                throw new Error('Error en la respuesta del servidor');
-            }
-
-            const data = await response.json();
-            const aiReplyText = data.reply || 'No pude procesar tu solicitud, intenta de nuevo.';
+            // El interceptor adjunta el token y gestiona el error 401 automáticamente
+            const { data } = await axiosInstance.post('/coach/chat', requestBody);
+            const aiReplyText = data.reply || 'No pude procesar tu solicitud, intenta de nuevo';
 
             // Añadir la respuesta de la IA
             const aiMsg = {
@@ -187,11 +195,21 @@ const ChatCoach = () => {
 
         } catch (error) {
             console.error('Error al comunicarse con el IA Coach:', error);
+
+            // 401 ya es manejado por el interceptor (limpia sesión y redirige a /login)
+            if (error.response?.status === 401) return;
+
+            const errorMsg =
+                error.response?.data?.error ||
+                (error.response?.status === 429
+                    ? 'Demasiadas solicitudes. Espera un momento e intenta de nuevo.'
+                    : 'Hubo un error al conectar con el servidor. Verifica tu conexión o intenta más tarde.');
+
             setMessages((prev) => [
                 ...prev,
                 {
                     id: (Date.now() + 1).toString(),
-                    text: 'Hubo un error al conectar con el servidor. Por favor, verifica tu conexión o intenta más tarde.',
+                    text: errorMsg,
                     sender: 'ai',
                     isError: true
                 }
@@ -384,7 +402,7 @@ const ChatCoach = () => {
             </div>
 
             {/* ── COLUMNA DERECHA (40%): INTERACTIVE HUB ── */}
-            <div className="hidden lg:flex w-[40%] h-full flex-col bg-gradient-to-br from-[#0B1120] to-[#1E293B] relative overflow-hidden">
+            <div className="hidden lg:flex w-[40%] h-full min-h-[500px] flex-col bg-gradient-to-br from-[#0B1120] to-[#1E293B] relative overflow-hidden">
 
                 {/* Ambientes decorativos y blur */}
                 <div className="absolute top-[-20%] left-[-10%] w-[120%] h-[120%] bg-[radial-gradient(ellipse_at_center,rgba(37,99,235,0.15),transparent_70%)] pointer-events-none" />
