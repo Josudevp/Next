@@ -19,13 +19,16 @@ services:
       - key: JWT_SECRET
         sync: false
       - key: FRONTEND_URL
-        fromStaticSite:
+        fromService:
           name: next-frontend
-          property: url
+          type: web
+          property: host
 
   # 2. LA CARA (FRONTEND)
-  - type: static
+  - type: web
     name: next-frontend
+    runtime: static
+    # ❌ SIN REGION AQUÍ PARA QUE NO FALLE
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
