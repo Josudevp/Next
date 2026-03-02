@@ -1,14 +1,10 @@
-################################################################
-# render.yaml — NEXT Project (IUB Edition)
-################################################################
-
 services:
-  # 1. BACKEND — Web Service (Node.js)
+  # 1. EL CEREBRO (BACKEND)
   - type: web
     name: next-backend
     runtime: node
-    region: oregon
     plan: free
+    region: oregon
     rootDir: backend
     buildCommand: npm install
     startCommand: node server.js
@@ -17,19 +13,19 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        sync: false           # Configura la URI de Aiven en el Dashboard
+        sync: false
       - key: GEMINI_API_KEY
-        sync: false           # Tu clave de pago de Google Cloud
+        sync: false
       - key: JWT_SECRET
         sync: false
       - key: FRONTEND_URL
-        fromStaticSite:       # <--- CAMBIO CLAVE: Referencia correcta
+        fromStaticSite:
           name: next-frontend
           property: url
 
-staticSites:                  # <--- CATEGORÍA RAÍZ CORRECTA
-  # 2. FRONTEND — Static Site (React / Vite)
-  - name: next-frontend
+  # 2. LA CARA (FRONTEND)
+  - type: static
+    name: next-frontend
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
