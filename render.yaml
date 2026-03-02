@@ -1,81 +1,42 @@
 ################################################################
-# render.yaml — Infrastructure as Code para el proyecto NEXT
-# Plataforma: Render (Free Tier) + Aiven MySQL
-# Docs: https://render.com/docs/blueprint-spec
-# Última actualización: 2026-03-02
+# render.yaml — NEXT Project (IUB Edition)
 ################################################################
 
 services:
-
-  # ──────────────────────────────────────────────────────────────
-  # 1. BACKEND — Web Service (Node.js / Express)
-  #    URL de producción: https://next-ryjd.onrender.com
-  # ──────────────────────────────────────────────────────────────
+  # 1. BACKEND — Web Service (Node.js)
   - type: web
     name: next-backend
     runtime: node
     region: oregon
     plan: free
-
     rootDir: backend
-
     buildCommand: npm install
     startCommand: node server.js
-
-    # Render pings esta ruta periódicamente para saber si el servicio
-    # está vivo. Debe responder 200. Definida en server.js.
     healthCheckPath: /health
-
     envVars:
       - key: NODE_ENV
         value: production
-
-      # ── Base de datos Aiven ────────────────────────────────────
-      # Pega aquí la "Service URI" de Aiven (panel: Overview → Connection info).
-      # Formato: mysql://USER:PASS@HOST:PORT/DB_NAME?ssl-mode=REQUIRED
-      # IMPORTANTE: sync:false → debes configurarla manualmente en el Dashboard.
       - key: DATABASE_URL
-        sync: false           # 🔒 Configúrala en Render → next-backend → Environment
-
-      # ── Seguridad ──────────────────────────────────────────────
+        sync: false           # Configura la URI de Aiven en el Dashboard
       - key: GEMINI_API_KEY
-        sync: false           # 🔒 Tu API key de Google AI Studio
-
+        sync: false           # Tu clave de pago de Google Cloud
       - key: JWT_SECRET
-        sync: false           # 🔒 Cadena larga y aleatoria para firmar tokens
-
-      # ── CORS: permite peticiones del frontend ──────────────────
-      # Render construye la URL del static site automáticamente.
+        sync: false
       - key: FRONTEND_URL
-        fromService:
+        fromStaticSite:       # <--- CAMBIO CLAVE: Referencia correcta
           name: next-frontend
-          type: web
-          property: host
+          property: url
 
-
-  # ──────────────────────────────────────────────────────────────
+staticSites:                  # <--- CATEGORÍA RAÍZ CORRECTA
   # 2. FRONTEND — Static Site (React / Vite)
-  # ──────────────────────────────────────────────────────────────
-  - type: static_site
-    name: next-frontend
-
+  - name: next-frontend
     rootDir: frontend
-
     buildCommand: npm install && npm run build
     staticPublishPath: dist
-
-    # ── Reglas SPA ─────────────────────────────────────────────
-    # Rewrite 200 (no redirect 301) → cualquier ruta desconocida
-    # devuelve index.html para que React Router la maneje.
-    # Esto evita 404 al recargar /dashboard, /profile, etc.
     routes:
       - type: rewrite
         source: /*
         destination: /index.html
-
     envVars:
-      # URL fija del backend en producción.
-      # Vite la inyecta en build time como import.meta.env.VITE_API_URL.
-      # El frontend la usa en src/api/api.js y src/api/axiosInstance.js.
       - key: VITE_API_URL
         value: https://next-ryjd.onrender.com/api
