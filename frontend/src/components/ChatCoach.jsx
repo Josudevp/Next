@@ -12,15 +12,10 @@ const ChatCoach = () => {
     // 1. Estados
     const [isInterviewMode, setIsInterviewMode] = useState(false);
 
-    const [messages, setMessages] = useState([
-        {
-            id: 'init',
-            text: '¡Hola! Soy tu IA Coach de NEXT. Estoy aquí para ayudarte a preparar entrevistas, darte consejos de empleabilidad o resolver dudas sobre tu carrera en tecnología. ¿En qué te puedo ayudar hoy?',
-            sender: 'ai'
-        }
-    ]);
+    // El chat empieza vacío — el /init endpoint genera el saludo personalizado
+    const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
-    const [isTyping, setIsTyping] = useState(false);
+    const [isTyping, setIsTyping] = useState(true); // true → muestra el loader de bienvenida
     const [isListening, setIsListening] = useState(false);
 
     // Referencias
@@ -42,6 +37,57 @@ const ChatCoach = () => {
     useEffect(() => {
         scrollToBottom();
     }, [messages, isTyping]);
+
+    // 3. Saludo personalizado — GET /api/coach/init
+    useEffect(() => {
+        const fetchInitGreeting = async () => {
+            try {
+                setIsTyping(true);
+                // axiosInstance inyecta el Authorization: Bearer <token> automáticamente
+                const { data } = await axiosInstance.get('/coach/init');
+                const greetingText = data.reply || '¡Hola! Soy tu IA Coach de NEXT. ¿En qué te puedo ayudar?';
+
+                setMessages([{
+                    id: 'init',
+                    text: greetingText,
+                    sender: 'ai'
+                }]);
+            } catch (error) {
+                console.error('[ChatCoach] Error al obtener saludo inicial:', error);
+                // Fallback genérico si el endpoint falla
+                setMessages([{
+                    id: 'init',
+                    text: '¡Hola! Soy tu IA Coach de NEXT. Estoy listo para ayudarte con tu preparación profesional. ¿Empezamos?',
+                    sender: 'ai'
+                }]);
+            } finally {
+                setIsTyping(false);
+            }
+        };
+
+        fetchInitGreeting();
+        // Solo al montar — no incluir dependencias para que no se repita
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // ── FIX BUG 3: Cleanup al desmontar el componente ────────────────────────
+    // Garantiza que el TTS y el micrófono se detengan al navegar a otra página
+    useEffect(() => {
+        return () => {
+            // Cancelar voz sintética inmediatamente al salir de la página
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+            }
+            // Detener el reconocimiento de voz si está activo
+            if (recognitionRef.current) {
+                recognitionRef.current.abort();
+            }
+            // Limpiar timer de silencio pendiente
+            if (silenceTimerRef.current) {
+                clearTimeout(silenceTimerRef.current);
+            }
+        };
+    }, []);
 
     // 3. Inicializar Web Speech API (Recognition)
     useEffect(() => {
@@ -70,7 +116,7 @@ const ChatCoach = () => {
                     clearTimeout(silenceTimerRef.current);
                 }
 
-                // 3. Iniciar nuevo timer de paciencia (2000ms de silencio)
+                // 3. Iniciar nuevo timer de paciencia (1250ms = flujo conversacional natural)
                 silenceTimerRef.current = setTimeout(() => {
                     const textToSend = sessionTranscript.trim();
                     if (isInterviewModeRef.current && sendMessageRef.current && textToSend) {
@@ -81,7 +127,7 @@ const ChatCoach = () => {
                         // En chat normal, detener escucha y dejar texto listo para enviar
                         recognitionRef.current?.stop();
                     }
-                }, 2000);
+                }, 1250);
             };
 
             recognitionRef.current.onerror = (event) => {
@@ -139,17 +185,64 @@ const ChatCoach = () => {
             .trim();
     };
 
-    // 5. Función de Text-to-Speech (Coach Voz)
+    // 5. Función de Text-to-Speech (Coach Voz) — con selección de voz femenina en español
     const speakText = (text) => {
-        if ('speechSynthesis' in window) {
-            window.speechSynthesis.cancel(); // Detener si algo ya estaba hablando
+        if (!('speechSynthesis' in window)) return;
 
-            const cleanText = cleanTextForSpeech(text);
+        window.speechSynthesis.cancel();
+        const cleanText = cleanTextForSpeech(text);
 
-            const utterance = new SpeechSynthesisUtterance(cleanText);
-            utterance.lang = 'es-ES';
-            utterance.rate = 1.05;
-            utterance.pitch = 1.0;
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.lang = 'es-ES';
+        utterance.rate = 1.05;
+        utterance.pitch = 1.1; // Tono ligeramente más agudo → percepción femenina
+
+        // Nombres comunes para voces femeninas en español (Chrome, Linux, Safari, Windows)
+        // Agregamos variantes comunes en Linux como 'Elena', 'Hispavox', 'Mexico'
+        const FEMALE_VOICE_NAMES = [
+            'Paulina', 'Mónica', 'Monica', 'Sabina', 'Helena', 'Elena', 'Laura',
+            'Lucia', 'Lucía', 'Esperanza', 'Zira', 'Hispavox Elena', 'Google español',
+            'Spanish Female', 'es-es', 'es-mx', 'f1', 'f2', 'Espanol', 'Mexico', 'Spain'
+        ];
+
+        const assignVoice = () => {
+            const voices = window.speechSynthesis.getVoices();
+            if (voices.length === 0) return false;
+
+            // 1. Priorizar por nombres conocidos de mujer + idioma español
+            let selected = voices.find(v =>
+                v.lang.startsWith('es') &&
+                FEMALE_VOICE_NAMES.some(name => v.name.toLowerCase().includes(name.toLowerCase()))
+            );
+
+            // 2. Fallback: cualquier voz que contenga 'female' o 'mujer' o 'f' en el nombre descriptivo
+            if (!selected) {
+                selected = voices.find(v =>
+                    v.lang.startsWith('es') &&
+                    (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('f') || v.name.toLowerCase().includes('mujer'))
+                ) || voices.find(v => v.lang.startsWith('es'));
+            }
+
+            if (selected) {
+                utterance.voice = selected;
+                // Si la voz parece ser masculina por nombre, elevamos el pitch para intentar feminizarla
+                const nameLow = selected.name.toLowerCase();
+                const isLikelyMale = nameLow.includes('male') || nameLow.includes('david') || nameLow.includes('pablo') || nameLow.includes('jose');
+                utterance.pitch = isLikelyMale ? 1.4 : 1.15;
+                console.debug('[TTS] Voz configurada:', selected.name);
+            } else {
+                utterance.pitch = 1.35; // Fallback extremo para dar tono femenino
+            }
+            return true;
+        };
+
+        if (!assignVoice()) {
+            window.speechSynthesis.onvoiceschanged = () => {
+                assignVoice();
+                window.speechSynthesis.speak(utterance);
+                window.speechSynthesis.onvoiceschanged = null;
+            };
+        } else {
             window.speechSynthesis.speak(utterance);
         }
     };
@@ -222,27 +315,60 @@ const ChatCoach = () => {
     // Actualizar referencia de sendMessage para que Web Speech API pueda usar su versión final
     sendMessageRef.current = sendMessage;
 
-    // 7. Activar Modo Simulación
-    const startInterview = () => {
+    // 7. Activar Modo Simulación — saludo personalizado vía Gemini
+    const startInterview = async () => {
         setIsInterviewMode(true);
-        const initText = "¡Perfecto! Iniciemos la simulación. Soy tu reclutador técnico del equipo NEXT. Cuéntame brevemente sobre tu experiencia con tecnologías web y cuál ha sido tu mayor reto programando.";
+        setIsTyping(true);
 
-        setMessages(prev => [...prev, {
-            id: Date.now().toString(),
-            text: initText,
-            sender: 'ai'
-        }]);
+        try {
+            // Reutilizamos /coach/init pero le indicamos al backend que es modo entrevista
+            // a través de un query param para que el prompt sea el de reclutador
+            const { data } = await axiosInstance.get('/coach/init?mode=interview');
+            const initText = data.reply || `¡Perfecto! Iniciemos la simulación. Soy tu reclutador. Cuéntame sobre tu experiencia en tu área.`;
 
-        speakText(initText);
+            setMessages(prev => [...prev, {
+                id: Date.now().toString(),
+                text: initText,
+                sender: 'ai'
+            }]);
+
+            // Leer en voz alta solo si el texto NO es un reporte
+            speakText(initText);
+
+        } catch (error) {
+            console.error('[startInterview] Error al obtener saludo de entrevista:', error);
+            const fallbackText = `¡Perfecto! Iniciemos la simulación. Soy tu reclutador. Cuéntame sobre tu experiencia y tus principales habilidades.`;
+            setMessages(prev => [...prev, { id: Date.now().toString(), text: fallbackText, sender: 'ai' }]);
+            speakText(fallbackText);
+        } finally {
+            setIsTyping(false);
+        }
     };
 
     // 8. Finalizar Simulación Forzosamente
     const stopInterview = async () => {
-        setIsInterviewMode(false);
+        // Detener voz y escucha inmediatamente
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        if (recognitionRef.current) recognitionRef.current.abort();
+        setIsListening(false);
+        setIsInterviewMode(false);
 
-        // Disparar prompt al backend para que evalúe
-        sendMessage(null, "He decidido finalizar la simulación técnica. Genera el reporte de mi desempeño técnico considerando lo que hemos conversado ahora mismo.");
+        // ── FIX BUG 2: Contar respuestas REALES del usuario en esta sesión ────
+        // Excluimos el mensaje 'init' del chat y el mensaje de inicio de entrevista (sender:'ai')
+        const userTurns = messages.filter(m => m.sender === 'user').length;
+
+        if (userTurns === 0) {
+            // El usuario cerró sin hablar: no generar reporte, solo notificar
+            setMessages(prev => [...prev, {
+                id: Date.now().toString(),
+                text: 'áSimulación cerrada! No hubo suficiente conversación para generar un reporte. Cuando estés listo, puedes iniciar una nueva simulación.',
+                sender: 'ai'
+            }]);
+            return; // ← salir sin llamar al backend
+        }
+
+        // Sólo llega aquí si el usuario respondió al menos 1 vez
+        sendMessage(null, 'He decidido finalizar la simulación. Genera el reporte de mi desempeño considerando lo que hemos conversado.');
     };
 
     return (

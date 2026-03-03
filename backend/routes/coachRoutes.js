@@ -1,9 +1,16 @@
 import express from 'express';
-import { chatWithCoach } from '../controllers/coachController.js';
+import { chatWithCoach, initCoach } from '../controllers/coachController.js';
+import { authMiddleware } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Endpoint POST para el chat con el entrenador IA
+// Todas las rutas del coach requieren autenticación
+router.use(authMiddleware);
+
+// GET  /api/coach/init  → primer mensaje personalizado generado por Gemini con perfil del usuario
+router.get('/init', initCoach);
+
+// POST /api/coach/chat  → chat continuo (normal + simulación de entrevista)
 router.post('/chat', chatWithCoach);
 
 export default router;

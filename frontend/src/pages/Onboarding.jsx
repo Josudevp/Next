@@ -7,6 +7,7 @@ import {
   HelpCircle, BookOpen, Search, Star
 } from 'lucide-react'
 import LogoNext from '../components/LogoNext'
+import axiosInstance from '../api/axiosInstance'
 
 // ─── Catálogo ─────────────────────────────────────────────────────────────────
 const AREAS = [
@@ -107,15 +108,16 @@ const NavButtons = ({ step, totalSteps, canAdvance, onBack, onNext, onFinish }) 
     ) : (
       <button
         onClick={onFinish}
-        disabled={!canAdvance}
+        disabled={!canAdvance || step === 'loading'}
         className={`flex items-center justify-center gap-2 flex-1 py-3 rounded-2xl font-semibold text-sm transition-all duration-200
-                    ${canAdvance
+                    ${canAdvance && step !== 'loading'
             ? 'text-white hover:opacity-90 hover:scale-[1.01] cursor-pointer shadow-md shadow-blue-200'
             : 'bg-gray-100 text-gray-300 cursor-not-allowed'
           }`}
-        style={canAdvance ? { background: 'linear-gradient(to right, #1B49AE, #2563EB)' } : {}}
+        style={canAdvance && step !== 'loading' ? { background: 'linear-gradient(to right, #1B49AE, #2563EB)' } : {}}
       >
-        <Sparkles size={16} /> Activar mi perfil
+        <Sparkles size={16} />
+        {step === 'loading' ? 'Guardando...' : 'Activar mi perfil'}
       </button>
     )}
   </div>
@@ -323,6 +325,7 @@ const Onboarding = () => {
   const [jobType, setJobType] = useState('')
   const [skills, setSkills] = useState([])
   const [goals, setGoals] = useState([])
+  const [isSaving, setIsSaving] = useState(false)
 
   const toggleSkill = (skill) =>
     setSkills(prev => prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill])
@@ -344,15 +347,37 @@ const Onboarding = () => {
     return false
   }
 
-  // ✅ POST /api/users/profile (backend futuro)
-  const handleFinish = () => {
-    const areaLabel = AREAS.find(a => a.id === area)?.label || area
-    const situationLabel = SITUATIONS.find(s => s.id === situation)?.label || situation
-    const jobTypeLabel = JOB_TYPES.find(j => j.id === jobType)?.label || jobType
-    const goalLabels = goals.map(g => GOALS.find(gl => gl.id === g)?.label).filter(Boolean)
-    const profile = { area, areaLabel, situation, situationLabel, jobType, jobTypeLabel, skills, goals, goalLabels }
-    localStorage.setItem('next_profile', JSON.stringify(profile))
-    navigate('/dashboard')
+  // ✅ PUT /api/user/update para sincronizar en MySQL
+  const handleFinish = async () => {
+    try {
+      setIsSaving(true)
+
+      const payload = {
+        area: area,
+        jobType: jobType,
+        skills: skills,
+        goals: goals
+      }
+
+      // Axios envía el Authorization Bearer automáticamente gracias al interceptor
+      const response = await axiosInstance.put('/user/update', payload)
+
+      if (response.status === 200) {
+        // Objeto devuelto por la Base de Datos con el nuevo score
+        const { user } = response.data
+
+        // Guardar respaldo local
+        localStorage.setItem('next_profile', JSON.stringify({ ...payload }))
+
+        // Redirigir al inicio formal (dashboard hidratado)
+        navigate('/dashboard')
+      }
+    } catch (error) {
+      console.error('Error al guardar datos de onboarding:', error)
+      alert('Hubo un error al guardar tu perfil. Intenta nuevamente.')
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -364,7 +389,7 @@ const Onboarding = () => {
         <LogoNext />
       </header>
 
-      {/* Barra de progreso */}  
+      {/* Barra de progreso */}
       <TopBar step={step} total={TOTAL_STEPS} />
 
       {/* Contenido del paso actual */}
@@ -378,9 +403,9 @@ const Onboarding = () => {
 
       {/* Navegación fija al fondo */}
       <NavButtons
-        step={step}
+        step={isSaving ? 'loading' : step}
         totalSteps={TOTAL_STEPS}
-        canAdvance={canAdvance()}
+        canAdvance={canAdvance() && !isSaving}
         onBack={() => setStep(s => s - 1)}
         onNext={() => setStep(s => s + 1)}
         onFinish={handleFinish}

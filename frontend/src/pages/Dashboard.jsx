@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import LogoNext from '../components/LogoNext'
 import ProfileEdit from '../components/ProfileEdit'
+import axiosInstance from '../api/axiosInstance'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // (El Score ahora se consume enteramente desde MySQL backend)
@@ -137,26 +138,17 @@ const Dashboard = () => {
       setUser(storedUser)
 
       try {
-        // Obtenemos los datos directos desde MySQL
-        const res = await fetch(`${API_URL}/user/profile`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
+        // Obtenemos los datos directos desde MySQL centralizados
+        const response = await axiosInstance.get('/user/profile')
+        const dbProfile = response.data
 
-        if (!res.ok) throw new Error('Error al cargar perfil desde servidor')
-
-        const dbProfile = await res.json()
         setProfile(dbProfile)
         setScore(dbProfile.score || 0)
 
       } catch (error) {
-        console.error('Error fetching DB profile, usando fallback', error)
-        // Fallback a onboarding si falla y no hay local fallback (o si quieres forzar al login)
-        const fallbackProfile = JSON.parse(localStorage.getItem('next_profile') || 'null')
-        if (!fallbackProfile) {
-          navigate('/onboarding', { replace: true })
-        } else {
-          setProfile(fallbackProfile)
-        }
+        console.error('Error fetching DB profile:', error)
+        // No usar fallback inseguro local, redirigir al onboarding siempre que el perfil no exista o falle
+        navigate('/onboarding', { replace: true })
       }
     }
 
