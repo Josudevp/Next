@@ -410,8 +410,9 @@ const Dashboard = () => {
 
         {/* ── BANNER: Habilidad de la semana ──────────── */}
         <div
-          className="rounded-2xl p-5 flex items-center justify-between gap-4 shadow-[0_2px_12px_rgba(37,99,235,0.1)] animate-fade-in-up"
+          className="rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-[0_2px_12px_rgba(37,99,235,0.1)] animate-fade-in-up cursor-pointer"
           style={{ background: 'linear-gradient(135deg, #1B49AE 0%, #2563EB 50%, #22D3EE 100%)' }}
+          onClick={() => navigate('/ia-coach')}
         >
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
@@ -430,8 +431,8 @@ const Dashboard = () => {
           </div>
 
           <button
-            onClick={() => navigate('/ia-coach')}
-            className="hidden sm:flex items-center gap-1.5 bg-white/15 hover:bg-white/25 border border-white/20 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-all cursor-pointer flex-shrink-0 backdrop-blur-sm"
+            onClick={(e) => { e.stopPropagation(); navigate('/ia-coach'); }}
+            className="flex items-center justify-center gap-1.5 self-start sm:self-auto bg-white/15 hover:bg-white/25 border border-white/20 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-all cursor-pointer flex-shrink-0 backdrop-blur-sm"
           >
             Practicar <ChevronRight size={13} />
           </button>

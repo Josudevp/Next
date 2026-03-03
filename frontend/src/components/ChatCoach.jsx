@@ -38,12 +38,23 @@ const ChatCoach = () => {
         scrollToBottom();
     }, [messages, isTyping]);
 
-    // 3. Saludo personalizado — GET /api/coach/init
+    // 3. Cargar historial persistente al montar; si está vacío, pedir saludo inicial
     useEffect(() => {
-        const fetchInitGreeting = async () => {
+        const loadHistoryOrGreet = async () => {
             try {
                 setIsTyping(true);
-                // axiosInstance inyecta el Authorization: Bearer <token> automáticamente
+
+                // ── Paso 1: intentar cargar historial guardado en MySQL ──────────
+                const { data: historyData } = await axiosInstance.get('/coach/history');
+                const savedMessages = historyData?.history ?? [];
+
+                if (savedMessages.length > 0) {
+                    // Hay historial → restaurar conversación anterior
+                    setMessages(savedMessages);
+                    return; // No hace falta el saludo inicial
+                }
+
+                // ── Paso 2: sin historial → obtener saludo personalizado de Gemini ──
                 const { data } = await axiosInstance.get('/coach/init');
                 const greetingText = data.reply || '¡Hola! Soy tu IA Coach de NEXT. ¿En qué te puedo ayudar?';
 
@@ -53,8 +64,7 @@ const ChatCoach = () => {
                     sender: 'ai'
                 }]);
             } catch (error) {
-                console.error('[ChatCoach] Error al obtener saludo inicial:', error);
-                // Fallback genérico si el endpoint falla
+                console.error('[ChatCoach] Error al cargar historial o saludo:', error);
                 setMessages([{
                     id: 'init',
                     text: '¡Hola! Soy tu IA Coach de NEXT. Estoy listo para ayudarte con tu preparación profesional. ¿Empezamos?',
@@ -65,7 +75,7 @@ const ChatCoach = () => {
             }
         };
 
-        fetchInitGreeting();
+        loadHistoryOrGreet();
         // Solo al montar — no incluir dependencias para que no se repita
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -185,7 +195,7 @@ const ChatCoach = () => {
             .trim();
     };
 
-    // 5. Función de Text-to-Speech (Coach Voz) — con selección de voz femenina en español
+    // 5. Función de Text-to-Speech (Coach Voz) — voz masculina en español
     const speakText = (text) => {
         if (!('speechSynthesis' in window)) return;
 
@@ -194,44 +204,47 @@ const ChatCoach = () => {
 
         const utterance = new SpeechSynthesisUtterance(cleanText);
         utterance.lang = 'es-ES';
-        utterance.rate = 1.05;
-        utterance.pitch = 1.1; // Tono ligeramente más agudo → percepción femenina
+        utterance.rate = 0.95;
+        utterance.pitch = 0.85; // Tono bajo → percepción masculina
 
-        // Nombres comunes para voces femeninas en español (Chrome, Linux, Safari, Windows)
-        // Agregamos variantes comunes en Linux como 'Elena', 'Hispavox', 'Mexico'
-        const FEMALE_VOICE_NAMES = [
-            'Paulina', 'Mónica', 'Monica', 'Sabina', 'Helena', 'Elena', 'Laura',
-            'Lucia', 'Lucía', 'Esperanza', 'Zira', 'Hispavox Elena', 'Google español',
-            'Spanish Female', 'es-es', 'es-mx', 'f1', 'f2', 'Espanol', 'Mexico', 'Spain'
+        // Nombres comunes para voces masculinas en español (Chrome, Linux, Safari, Windows)
+        const MALE_VOICE_NAMES = [
+            'Jorge', 'Carlos', 'Diego', 'Pablo', 'Juan', 'Miguel',
+            'Enrique', 'Matias', 'Rodrigo', 'Martin', 'Alvaro', 'Andres',
+            'David', 'Jose', 'Google español de Estados Unidos', 'Google español',
+            'Spanish Male', 'Male', 'Español', 'es-us', 'es-mx', 'es-es'
         ];
 
         const assignVoice = () => {
             const voices = window.speechSynthesis.getVoices();
             if (voices.length === 0) return false;
 
-            // 1. Priorizar por nombres conocidos de mujer + idioma español
+            // 1. Priorizar por nombres conocidos de hombre + idioma español
             let selected = voices.find(v =>
                 v.lang.startsWith('es') &&
-                FEMALE_VOICE_NAMES.some(name => v.name.toLowerCase().includes(name.toLowerCase()))
+                MALE_VOICE_NAMES.some(name => v.name.toLowerCase().includes(name.toLowerCase()))
             );
 
-            // 2. Fallback: cualquier voz que contenga 'female' o 'mujer' o 'f' en el nombre descriptivo
+            // 2. Fallback: cualquier voz española que no sea claramente femenina
             if (!selected) {
                 selected = voices.find(v =>
                     v.lang.startsWith('es') &&
-                    (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('f') || v.name.toLowerCase().includes('mujer'))
+                    (v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('hombre'))
                 ) || voices.find(v => v.lang.startsWith('es'));
             }
 
             if (selected) {
                 utterance.voice = selected;
-                // Si la voz parece ser masculina por nombre, elevamos el pitch para intentar feminizarla
+                // Si la voz parece femenina por nombre, bajamos el pitch para masculinizarla
                 const nameLow = selected.name.toLowerCase();
-                const isLikelyMale = nameLow.includes('male') || nameLow.includes('david') || nameLow.includes('pablo') || nameLow.includes('jose');
-                utterance.pitch = isLikelyMale ? 1.4 : 1.15;
-                console.debug('[TTS] Voz configurada:', selected.name);
+                const isLikelyFemale = nameLow.includes('female') || nameLow.includes('woman') ||
+                    nameLow.includes('elena') || nameLow.includes('lucia') ||
+                    nameLow.includes('monica') || nameLow.includes('paulina') ||
+                    nameLow.includes('sabina') || nameLow.includes('helena');
+                utterance.pitch = isLikelyFemale ? 0.55 : 0.85;
+                console.debug('[TTS] Voz configurada (masculina):', selected.name);
             } else {
-                utterance.pitch = 1.35; // Fallback extremo para dar tono femenino
+                utterance.pitch = 0.70; // Fallback grave para tono masculino
             }
             return true;
         };
@@ -378,17 +391,40 @@ const ChatCoach = () => {
             <div className="w-full lg:w-[60%] flex flex-col h-full border-r border-gray-100 shadow-[2px_0_15px_rgba(0,0,0,0.02)] relative z-10 bg-white">
 
                 {/* Header (Nav interno) */}
-                <div className="h-16 flex items-center px-6 border-b border-gray-100 flex-shrink-0">
+                <div className="h-16 flex items-center px-4 sm:px-6 border-b border-gray-100 flex-shrink-0 gap-2">
                     <button
                         onClick={() => {
                             if ('speechSynthesis' in window) window.speechSynthesis.cancel();
                             navigate('/dashboard');
                         }}
-                        className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-[#2563EB] transition-colors cursor-pointer"
+                        className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-[#2563EB] transition-colors cursor-pointer flex-shrink-0"
                     >
-                        <ChevronLeft size={16} /> Volver al Dashboard
+                        <ChevronLeft size={16} />
+                        <span className="hidden sm:inline">Volver al Dashboard</span>
                     </button>
-                    <div className="ml-auto">
+
+                    {/* Botón de simulación — solo visible en móvil (lg:hidden) */}
+                    <div className="lg:hidden flex-1 flex justify-center">
+                        {isInterviewMode ? (
+                            <button
+                                onClick={stopInterview}
+                                className="flex items-center gap-1.5 text-xs font-semibold text-red-500 border border-red-200 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-full transition-all cursor-pointer"
+                            >
+                                <SquareSquare size={13} /> Finalizar Simulación
+                            </button>
+                        ) : (
+                            <button
+                                onClick={startInterview}
+                                disabled={isTyping}
+                                className="flex items-center gap-1.5 text-xs font-semibold text-white px-3 py-1.5 rounded-full transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                style={{ background: 'linear-gradient(to right, #2563EB, #22D3EE)' }}
+                            >
+                                <PlayCircle size={13} /> Simular Entrevista
+                            </button>
+                        )}
+                    </div>
+
+                    <div className="ml-auto lg:ml-0">
                         <LogoNext />
                     </div>
                 </div>
@@ -438,9 +474,6 @@ const ChatCoach = () => {
                                             <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
                                             <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
                                             <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span>
-                                            <span className="text-xs text-gray-400 ml-1.5 font-medium">
-                                                Analizando respuesta...
-                                            </span>
                                         </div>
                                     </div>
                                 </div>
@@ -492,18 +525,21 @@ const ChatCoach = () => {
                         </div>
                     </>
                 ) : (
-                    <div className="flex-1 flex flex-col items-center justify-center bg-slate-50 px-6 py-8 relative">
-                        <div className="absolute top-1/4 flex flex-col items-center text-center">
-                            <div className={`w-24 h-24 mb-6 rounded-full flex items-center justify-center bg-white shadow-xl ${isListening ? 'shadow-red-500/30' : 'shadow-blue-500/20'}`}>
-                                {isTyping ? <Activity size={40} className="text-[#2563EB] animate-pulse" /> : isListening ? <Mic size={40} className="text-red-500 animate-pulse" /> : <Bot size={40} className="text-gray-800" />}
+                    <div className="flex-1 flex flex-col items-center justify-between bg-slate-50 px-4 sm:px-6 py-6 sm:py-8 overflow-y-auto">
+                        {/* Centro: icono + estado */}
+                        <div className="flex-1 flex flex-col items-center justify-center text-center gap-4 py-4">
+                            <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center bg-white shadow-xl ${isListening ? 'shadow-red-500/30' : 'shadow-blue-500/20'}`}>
+                                {isTyping ? <Activity size={36} className="text-[#2563EB] animate-pulse" /> : isListening ? <Mic size={36} className="text-red-500 animate-pulse" /> : <Bot size={36} className="text-gray-800" />}
                             </div>
-                            <h2 className="text-2xl font-bold text-gray-800 mb-2">Entrevista en curso</h2>
-                            <p className="text-gray-500 max-w-sm">
-                                {isListening ? 'Te estoy escuchando. Responde en voz alta y seré todo oídos.' : isTyping ? 'El Reclutador está procesando tu respuesta...' : 'Presiona el micrófono inferior para hablar.'}
-                            </p>
+                            <div>
+                                <h2 className="text-xl sm:text-2xl font-bold text-gray-800 mb-2">Entrevista en curso</h2>
+                                <p className="text-gray-500 text-sm sm:text-base max-w-xs sm:max-w-sm">
+                                    {isListening ? 'Te estoy escuchando. Responde en voz alta y seré todo oídos.' : isTyping ? 'El Reclutador está procesando tu respuesta...' : 'Presiona el micrófono inferior para hablar.'}
+                                </p>
+                            </div>
 
                             {/* Simulador de Frecuencia Audio */}
-                            <div className="flex items-center justify-center gap-1 mt-8 h-12">
+                            <div className="flex items-center justify-center gap-1 h-10 sm:h-12">
                                 {[...Array(8)].map((_, i) => (
                                     <div
                                         key={i}
@@ -514,10 +550,11 @@ const ChatCoach = () => {
                             </div>
                         </div>
 
-                        <div className="mt-auto pt-10 w-full max-w-sm mx-auto flex flex-col gap-4">
+                        {/* Controles inferiores */}
+                        <div className="w-full max-w-sm mx-auto flex flex-col gap-3">
                             <button
                                 onClick={toggleListening}
-                                className={`w-full py-4 rounded-2xl font-bold flex flex-col items-center justify-center gap-1 transition-all shadow-lg active:scale-95 cursor-pointer ${isListening ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-[#2563EB] text-white hover:bg-blue-700'}`}
+                                className={`w-full py-3.5 sm:py-4 rounded-2xl font-bold flex flex-col items-center justify-center gap-1 transition-all shadow-lg active:scale-95 cursor-pointer ${isListening ? 'bg-red-50 text-red-600 border border-red-200' : 'bg-[#2563EB] text-white hover:bg-blue-700'}`}
                             >
                                 {isListening ? <MicOff size={24} /> : <Mic size={24} />}
                                 <span>{isListening ? 'Terminar de Hablar' : 'Pulsar para Hablar'}</span>

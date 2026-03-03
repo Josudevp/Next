@@ -86,7 +86,7 @@ const Login = () => {
     }
 
     return (
-        <div className="flex flex-col-reverse sm:flex-row h-screen w-full relative overflow-hidden">
+        <div className="flex flex-col-reverse sm:flex-row min-h-screen sm:h-screen w-full relative overflow-y-auto sm:overflow-hidden">
 
             {/* ── Logo mobile ─────────────────────────────────── */}
             <div className="sm:hidden absolute top-6 left-6 z-10">
@@ -101,10 +101,10 @@ const Login = () => {
                 className="
                     bg-white flex-1 sm:flex-none
                     sm:w-[45%] lg:w-[42%] xl:w-[38%]
-                    h-screen flex items-center justify-center
+                    min-h-screen sm:h-screen flex sm:items-center sm:justify-center
                     sm:bg-[#31445E] sm:bg-[radial-gradient(circle,#69809E_0%,#31445E_100%)]
                     sm:shadow-[5px_0_30px_rgba(0,0,0,0.25)]
-                    py-8 px-5 relative
+                    pt-20 pb-10 px-5 sm:py-8 relative
                 "
             >
                 {/* Elementos decorativos de profundidad — solo desktop */}

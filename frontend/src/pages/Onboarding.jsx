@@ -64,7 +64,7 @@ const GOALS = [
 
 // ─── Barra de progreso (azul = next-primary) ──────────────────────────────────
 const TopBar = ({ step, total }) => (
-  <div className="w-full max-w-2xl mx-auto px-8 pb-6">
+  <div className="w-full max-w-2xl mx-auto px-4 sm:px-8 pb-4 sm:pb-6">
     <div className="flex justify-between items-center mb-3">
       <div className="flex items-center gap-2">
         <Sparkles size={14} className="text-[#2563EB]" />
@@ -83,7 +83,7 @@ const TopBar = ({ step, total }) => (
 
 // ─── Botones de navegación ────────────────────────────────────────────────────
 const NavButtons = ({ step, totalSteps, canAdvance, onBack, onNext, onFinish }) => (
-  <div className="flex gap-3 w-full max-w-2xl mx-auto px-8 pt-6 pb-8">
+  <div className="flex gap-3 w-full max-w-2xl mx-auto px-4 sm:px-8 pt-4 sm:pt-6 pb-6 sm:pb-8">
     {step > 1 && (
       <button
         onClick={onBack}
@@ -125,7 +125,7 @@ const NavButtons = ({ step, totalSteps, canAdvance, onBack, onNext, onFinish }) 
 
 // ─── PASO 1: Área — 3 columnas para evitar scroll ────────────────────────────
 const StepArea = ({ selected, onSelect }) => (
-  <div className="flex-1 flex flex-col gap-4 w-full max-w-2xl mx-auto px-8 overflow-y-auto">
+  <div className="flex-1 flex flex-col gap-4 w-full max-w-2xl mx-auto px-4 sm:px-8 overflow-y-auto">
     <div className="text-center mb-2">
       <div className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-blue-50 mb-3">
         <BookOpen size={22} className="text-[#2563EB]" />
@@ -166,7 +166,7 @@ const StepArea = ({ selected, onSelect }) => (
 
 // ─── PASO 2: Situación académica ──────────────────────────────────────────────
 const StepSituation = ({ selected, onSelect }) => (
-  <div className="flex-1 flex flex-col gap-4 w-full max-w-2xl mx-auto px-8 overflow-y-auto">
+  <div className="flex-1 flex flex-col gap-4 w-full max-w-2xl mx-auto px-4 sm:px-8 overflow-y-auto">
     <div className="text-center mb-2">
       <div className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-blue-50 mb-3">
         <GraduationCap size={22} className="text-[#2563EB]" />
@@ -202,7 +202,7 @@ const StepSituation = ({ selected, onSelect }) => (
 
 // ─── PASO 3: Tipo de oportunidad ──────────────────────────────────────────────
 const StepJobType = ({ selected, onSelect }) => (
-  <div className="flex-1 flex flex-col gap-4 w-full max-w-2xl mx-auto px-8 overflow-y-auto">
+  <div className="flex-1 flex flex-col gap-4 w-full max-w-2xl mx-auto px-4 sm:px-8 overflow-y-auto">
     <div className="text-center mb-2">
       <div className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-blue-50 mb-3">
         <Search size={22} className="text-[#2563EB]" />
@@ -240,7 +240,7 @@ const StepJobType = ({ selected, onSelect }) => (
 const StepSkills = ({ area, selected, onToggle }) => {
   const skills = SKILLS_BY_AREA[area] || []
   return (
-    <div className="flex-1 flex flex-col gap-4 w-full max-w-2xl mx-auto px-8 overflow-y-auto">
+    <div className="flex-1 flex flex-col gap-4 w-full max-w-2xl mx-auto px-4 sm:px-8 overflow-y-auto">
       <div className="text-center mb-2">
         <div className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-blue-50 mb-3">
           <Star size={22} className="text-[#2563EB]" />
@@ -278,7 +278,7 @@ const StepSkills = ({ area, selected, onToggle }) => {
 
 // ─── PASO 5: Metas ────────────────────────────────────────────────────────────
 const StepGoals = ({ selected, onToggle }) => (
-  <div className="flex-1 flex flex-col gap-4 w-full max-w-2xl mx-auto px-8 overflow-y-auto">
+  <div className="flex-1 flex flex-col gap-4 w-full max-w-2xl mx-auto px-4 sm:px-8 overflow-y-auto">
     <div className="text-center mb-2">
       <div className="inline-flex items-center justify-center w-11 h-11 rounded-2xl bg-blue-50 mb-3">
         <Sparkles size={22} className="text-[#2563EB]" />
@@ -385,7 +385,7 @@ const Onboarding = () => {
     <div className="min-h-screen w-full bg-white flex flex-col">
 
       {/* Logo centrado con espacio generoso — coherente con Login y SignIn */}
-      <header className="w-full flex justify-center items-center pt-10 pb-8 pl-12 flex-shrink-0">
+      <header className="w-full flex justify-center items-center pt-6 pb-4 sm:pt-10 sm:pb-8 pl-6 sm:pl-12 flex-shrink-0">
         <LogoNext />
       </header>
 

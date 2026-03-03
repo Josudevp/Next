@@ -136,7 +136,7 @@ const SigIn = () => {
     }
 
     return (
-        <div className="flex flex-col justify-center items-center h-screen w-full sm:flex-row relative overflow-hidden">
+        <div className="flex flex-col sm:flex-row min-h-screen sm:h-screen w-full relative sm:overflow-hidden">
 
             {/* ── Logo mobile ─────────────────────────────────── */}
             <div className="sm:hidden absolute top-6 left-6 z-10">
@@ -175,13 +175,13 @@ const SigIn = () => {
             <aside
                 aria-label="Panel de registro"
                 className="
-                    flex justify-center items-center px-6 sm:px-10
+                    flex justify-center items-start sm:items-center px-6 sm:px-10
                     bg-white flex-1
                     sm:flex-none sm:w-[45%] lg:w-[42%] xl:w-[38%]
-                    h-screen
+                    min-h-screen sm:h-screen
                     sm:bg-[radial-gradient(circle,#69809E_0%,#31445E_100%)]
                     sm:shadow-[-5px_0_30px_rgba(0,0,0,0.25)]
-                    relative
+                    pt-20 pb-10 sm:py-0 relative
                 "
             >
                 {/* Elementos decorativos — solo desktop */}

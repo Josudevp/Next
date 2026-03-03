@@ -20,7 +20,12 @@ let sequelize;
 
 if (process.env.DATABASE_URL) {
   // ── PRODUCCIÓN ─────────────────────────────────────────────────────────────
-  sequelize = new Sequelize(process.env.DATABASE_URL, {
+  // FIX: Aiven incluye 'ssl-mode=REQUIRED' en la URL, lo cual causa un warning
+  // en Sequelize/mysql2. Lo eliminamos de la URL y lo gestionamos explícitamente
+  // con dialectOptions.ssl.
+  const dbUrl = process.env.DATABASE_URL.replace('?ssl-mode=REQUIRED', '');
+
+  sequelize = new Sequelize(dbUrl, {
     dialect: 'mysql',
     dialectOptions: {
       ssl: {

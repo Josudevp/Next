@@ -5,6 +5,7 @@ import express from 'express';
 import cors from 'cors';
 import sequelize from './config/db.js';
 import './models/User.js';
+import './models/Message.js'; // Registra el modelo y define la asociación User → Message
 
 // Rutas
 import authRoutes from './routes/authRoutes.js';
