@@ -120,13 +120,13 @@ const SigIn = () => {
                 return
             }
 
-            // Éxito
+            // Éxito — nuevo usuario va siempre a onboarding primero
             localStorage.setItem('next_token', data.token)
             localStorage.setItem('next_user', JSON.stringify(data.user))
             localStorage.setItem('next_session', 'true')
 
-            // Redirigir al dashboard
-            navigate('/dashboard', { replace: true })
+            // Primer destino obligatorio: onboarding para completar el perfil
+            navigate('/onboarding', { replace: true })
         } catch (error) {
             console.error('Error en registro:', error)
             setErrores({ global: 'Error de conexión con el servidor.' })

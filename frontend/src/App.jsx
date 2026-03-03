@@ -1,25 +1,31 @@
 import { Component } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import './App.css'
+
+// ── Páginas públicas ──────────────────────────────────────────────────────────
+import Home from './pages/Home'
 import Login from './pages/Login'
 import SigIn from './pages/SigIn'
-import Home from './pages/Home'
+
+// ── Páginas privadas ──────────────────────────────────────────────────────────
 import Onboarding from './pages/Onboarding'
 import Dashboard from './pages/Dashboard'
 import IACoach from './pages/IACoach'
 
-// ── Error Boundary Global ────────────────────────────────────────────────────
+// ── Guardia de rutas ──────────────────────────────────────────────────────────
+import ProtectedRoute from './components/ProtectedRoute'
+
+// ── Error Boundary Global ─────────────────────────────────────────────────────
 // Captura cualquier error de renderizado no controlado en producción
-// (ej. WebGL, importaciones fallidas) y muestra una pantalla de recuperación
-// en lugar de dejar la app en blanco (white screen of death).
+// (ej. WebGL, importaciones fallidas) y evita la pantalla en blanco.
 class GlobalErrorBoundary extends Component {
   constructor(props) {
     super(props)
-    this.state = { hasError: false, error: null }
+    this.state = { hasError: false }
   }
 
-  static getDerivedStateFromError(error) {
-    return { hasError: true, error }
+  static getDerivedStateFromError() {
+    return { hasError: true }
   }
 
   componentDidCatch(error, info) {
@@ -57,18 +63,29 @@ class GlobalErrorBoundary extends Component {
   }
 }
 
-// ── App ──────────────────────────────────────────────────────────────────────
+// ── App ───────────────────────────────────────────────────────────────────────
 function App() {
   return (
     <GlobalErrorBoundary>
       <BrowserRouter>
         <Routes>
+
+          {/* ── Rutas PÚBLICAS — accesibles sin sesión ── */}
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signin" element={<SigIn />} />
-          <Route path="/onboarding" element={<Onboarding />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/ia-coach" element={<IACoach />} />
+
+          {/* ── Rutas PRIVADAS — requieren next_token + next_session ── */}
+          <Route path="/onboarding" element={
+            <ProtectedRoute><Onboarding /></ProtectedRoute>
+          } />
+          <Route path="/dashboard" element={
+            <ProtectedRoute><Dashboard /></ProtectedRoute>
+          } />
+          <Route path="/ia-coach" element={
+            <ProtectedRoute><IACoach /></ProtectedRoute>
+          } />
+
         </Routes>
       </BrowserRouter>
     </GlobalErrorBoundary>
