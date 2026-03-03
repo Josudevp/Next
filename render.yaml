@@ -22,7 +22,7 @@ services:
         fromService:
           name: next-frontend
           type: web
-          property: host
+          property: url
 
   # 2. LA CARA (FRONTEND)
   - type: web

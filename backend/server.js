@@ -15,13 +15,18 @@ import userRoutes from './routes/userRoutes.js';
 const app = express();
 
 // ── CORS ────────────────────────────────────────────────────────────────────
-// En producción, Render inyecta FRONTEND_URL automáticamente desde el render.yaml.
-// En local, el frontend corre en http://localhost:5173.
+// render.yaml inyecta FRONTEND_URL via property:url (incluye https://).
+// La normalización defensiva cubre el caso de que venga sin protocolo.
+const normalizeFrontendUrl = (url) => {
+  if (!url) return null;
+  return url.startsWith('http') ? url : `https://${url}`;
+};
+
 const allowedOrigins = [
-  process.env.FRONTEND_URL,
+  normalizeFrontendUrl(process.env.FRONTEND_URL),
   'http://localhost:5173',
   'http://localhost:4173',
-].filter(Boolean); // Elimina valores undefined/null
+].filter(Boolean);
 
 app.use(
   cors({
