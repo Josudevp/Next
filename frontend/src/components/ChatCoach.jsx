@@ -127,7 +127,7 @@ const ChatCoach = () => {
                         // En chat normal, detener escucha y dejar texto listo para enviar
                         recognitionRef.current?.stop();
                     }
-                }, 1250);
+                }, 1500);
             };
 
             recognitionRef.current.onerror = (event) => {
