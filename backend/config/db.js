@@ -29,17 +29,21 @@ if (process.env.DATABASE_URL) {
     dialect: 'mysql',
     dialectOptions: {
       ssl: {
-        // false: permite el certificado autofirmado de Aiven en Render.
-        // Si en el futuro descargas el CA cert de Aiven y lo incluyes
-        // en el repo, cambia esto a true y adjunta el cert.
         rejectUnauthorized: false,
       },
+      // Tiempo máximo para establecer la conexión TCP con Aiven.
+      // El default de mysql2 es 10s — demasiado bajo para Aiven free tier.
+      connectTimeout: 60000,
     },
     pool: {
-      max: 5,       // Máximo conexiones simultáneas (Free Tier de Aiven es limitado)
+      max: 5,
       min: 0,
-      acquire: 30000,
+      acquire: 60000,  // Tiempo máximo para obtener una conexión del pool (era 30s)
       idle: 10000,
+      evict: 10000,    // Frecuencia con que se limpian conexiones muertas del pool
+    },
+    retry: {
+      max: 3,          // Reintentar operaciones fallidas hasta 3 veces automáticamente
     },
     logging: false,
   });

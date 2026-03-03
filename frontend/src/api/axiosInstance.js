@@ -8,7 +8,7 @@ const API_BASE = import.meta.env.VITE_API_URL
 
 const axiosInstance = axios.create({
     baseURL: API_BASE,
-    timeout: 30000,
+    timeout: 90000, // 90s — necesario para reportes con gemini-2.5-pro (análisis profundo)
     headers: { 'Content-Type': 'application/json' },
 });
 

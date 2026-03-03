@@ -1,23 +1,35 @@
-import { Component } from 'react'
+import { Component, lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import './App.css'
 
-// ── Páginas públicas ──────────────────────────────────────────────────────────
-import Home from './pages/Home'
-import Login from './pages/Login'
-import SigIn from './pages/SigIn'
-
-// ── Páginas privadas ──────────────────────────────────────────────────────────
-import Onboarding from './pages/Onboarding'
-import Dashboard from './pages/Dashboard'
-import IACoach from './pages/IACoach'
+// ── Lazy Loading por ruta ─────────────────────────────────────────────────────
+// Cada página se convierte en su propio chunk JS. El navegador solo descarga
+// el código de la ruta que el usuario visita, reduciendo el bundle inicial.
+const Home       = lazy(() => import('./pages/Home'))
+const Login      = lazy(() => import('./pages/Login'))
+const SigIn      = lazy(() => import('./pages/SigIn'))
+const Onboarding = lazy(() => import('./pages/Onboarding'))
+const Dashboard  = lazy(() => import('./pages/Dashboard'))
+const IACoach    = lazy(() => import('./pages/IACoach'))
 
 // ── Guardia de rutas ──────────────────────────────────────────────────────────
 import ProtectedRoute from './components/ProtectedRoute'
 
+// ── Loader mínimo de navegación entre rutas ───────────────────────────────────
+const PageLoader = () => (
+  <div
+    role="status"
+    aria-label="Cargando página"
+    className="min-h-screen bg-white flex items-center justify-center"
+  >
+    <div className="flex flex-col items-center gap-3">
+      <div className="w-8 h-8 rounded-full border-2 border-[#2563EB] border-t-transparent animate-spin" />
+      <span className="text-sm text-gray-400 font-medium">Cargando...</span>
+    </div>
+  </div>
+)
+
 // ── Error Boundary Global ─────────────────────────────────────────────────────
-// Captura cualquier error de renderizado no controlado en producción
-// (ej. WebGL, importaciones fallidas) y evita la pantalla en blanco.
 class GlobalErrorBoundary extends Component {
   constructor(props) {
     super(props)
@@ -35,8 +47,8 @@ class GlobalErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen bg-white flex flex-col items-center justify-center gap-6 px-6 text-center">
-          <div className="w-16 h-16 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center">
+        <main className="min-h-screen bg-white flex flex-col items-center justify-center gap-6 px-6 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center" aria-hidden="true">
             <svg xmlns="http://www.w3.org/2000/svg" width="28" height="28" viewBox="0 0 24 24"
               fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="12" cy="12" r="10" />
@@ -56,7 +68,7 @@ class GlobalErrorBoundary extends Component {
           >
             Recargar página
           </button>
-        </div>
+        </main>
       )
     }
     return this.props.children
@@ -68,25 +80,27 @@ function App() {
   return (
     <GlobalErrorBoundary>
       <BrowserRouter>
-        <Routes>
+        <Suspense fallback={<PageLoader />}>
+          <Routes>
 
-          {/* ── Rutas PÚBLICAS — accesibles sin sesión ── */}
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signin" element={<SigIn />} />
+            {/* ── Rutas PÚBLICAS — accesibles sin sesión ── */}
+            <Route path="/" element={<Home />} />
+            <Route path="/login" element={<Login />} />
+            <Route path="/signin" element={<SigIn />} />
 
-          {/* ── Rutas PRIVADAS — requieren next_token + next_session ── */}
-          <Route path="/onboarding" element={
-            <ProtectedRoute><Onboarding /></ProtectedRoute>
-          } />
-          <Route path="/dashboard" element={
-            <ProtectedRoute><Dashboard /></ProtectedRoute>
-          } />
-          <Route path="/ia-coach" element={
-            <ProtectedRoute><IACoach /></ProtectedRoute>
-          } />
+            {/* ── Rutas PRIVADAS — requieren next_token + next_session ── */}
+            <Route path="/onboarding" element={
+              <ProtectedRoute><Onboarding /></ProtectedRoute>
+            } />
+            <Route path="/dashboard" element={
+              <ProtectedRoute><Dashboard /></ProtectedRoute>
+            } />
+            <Route path="/ia-coach" element={
+              <ProtectedRoute><IACoach /></ProtectedRoute>
+            } />
 
-        </Routes>
+          </Routes>
+        </Suspense>
       </BrowserRouter>
     </GlobalErrorBoundary>
   )

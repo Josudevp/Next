@@ -14,7 +14,7 @@ services:
         value: production
       - key: DATABASE_URL
         sync: false
-      - key: GEMINI_API_KEY
+      - key: GOOGLE_API_KEY
         sync: false
       - key: JWT_SECRET
         sync: false
@@ -28,14 +28,26 @@ services:
   - type: web
     name: next-frontend
     runtime: static
-    # ❌ SIN REGION AQUÍ PARA QUE NO FALLE
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
+    headers:
+      - path: /assets/*
+        name: Cache-Control
+        value: public, max-age=31536000, immutable
+      - path: /*
+        name: X-Content-Type-Options
+        value: nosniff
+      - path: /*
+        name: X-Frame-Options
+        value: DENY
+      - path: /*
+        name: Referrer-Policy
+        value: strict-origin-when-cross-origin
     routes:
       - type: rewrite
         source: /*
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        value: https://next-backend-i6el.onrender.com/api
+        value: https://next-backend-i6el.onrender.com
