@@ -19,10 +19,7 @@ services:
       - key: JWT_SECRET
         sync: false
       - key: FRONTEND_URL
-        fromService:
-          name: next-frontend
-          type: web
-          property: url
+        value: https://next-frontend-i0yt.onrender.com
 
   # 2. LA CARA (FRONTEND)
   - type: web

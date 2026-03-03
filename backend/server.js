@@ -15,11 +15,11 @@ import userRoutes from './routes/userRoutes.js';
 const app = express();
 
 // ── CORS ────────────────────────────────────────────────────────────────────
-// render.yaml inyecta FRONTEND_URL via property:url (incluye https://).
-// La normalización defensiva cubre el caso de que venga sin protocolo.
 const normalizeFrontendUrl = (url) => {
   if (!url) return null;
-  return url.startsWith('http') ? url : `https://${url}`;
+  // Quitar trailing slash si viene con él
+  const clean = url.endsWith('/') ? url.slice(0, -1) : url;
+  return clean.startsWith('http') ? clean : `https://${clean}`;
 };
 
 const allowedOrigins = [
@@ -28,15 +28,19 @@ const allowedOrigins = [
   'http://localhost:4173',
 ].filter(Boolean);
 
+// Regex de seguridad: acepta cualquier subdominio de onrender.com en caso
+// de que el FRONTEND_URL no esté configurado o cambie de URL.
+const ONRENDER_REGEX = /^https:\/\/.*\.onrender\.com$/;
+
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Permite peticiones sin origin (Postman, curl, etc.)
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error(`CORS bloqueado para el origen: ${origin}`));
+      if (!origin) return callback(null, true); // Postman, curl, etc.
+      if (allowedOrigins.includes(origin) || ONRENDER_REGEX.test(origin)) {
+        return callback(null, true);
       }
+      console.error(`[CORS] Bloqueado: ${origin} | Permitidos: ${allowedOrigins.join(', ')}`);
+      return callback(new Error(`CORS bloqueado para el origen: ${origin}`));
     },
     credentials: true,
   })
