@@ -1,13 +1,17 @@
 import { useState, useRef, useEffect } from 'react';
 import { Bot, Send, User, Loader2, ChevronLeft, Mic, MicOff, PlayCircle, SquareSquare, Activity } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import LogoNext from '../components/LogoNext';
 import Robot3D from '../components/Robot3D';
 import axiosInstance from '../api/axiosInstance';
 
 const ChatCoach = () => {
     const navigate = useNavigate();
+    const location = useLocation();
+
+    // Job HuNTER: si venimos con datos de un empleo, prepara el prompt automático
+    const pendingJobPrepRef = useRef(location.state?.jobPrep || null);
 
     // 1. Estados
     const [isInterviewMode, setIsInterviewMode] = useState(false);
@@ -20,23 +24,14 @@ const ChatCoach = () => {
 
     // Referencias
     const messagesEndRef = useRef(null);
-    const recognitionRef = useRef(null); // mantenido para compatibilidad pero sin uso
+    const recognitionRef = useRef(null);
     const isInterviewModeRef = useRef(isInterviewMode);
     const sendMessageRef = useRef(null);
     const silenceTimerRef = useRef(null);
     const prevInputRef = useRef('');
 
-    // Nuevas refs para TTS y STT
-    const currentAudioRef = useRef(null);    // Audio element activo del TTS
-    const mediaRecorderRef = useRef(null);   // MediaRecorder para grabación de voz
-    const audioChunksRef = useRef([]);       // Fragmentos de audio grabado
-    const audioStreamRef = useRef(null);     // MediaStream activo
-    const isListeningRef = useRef(false);    // Estado de escucha para closures async
-    const interviewStartIndexRef = useRef(0); // Índice donde empieza la sesión de entrevista actual
-
     // Actualizar referencias en cada render para prevenir stale closures en eventos
     isInterviewModeRef.current = isInterviewMode;
-    isListeningRef.current = isListening;
 
     // 2. Auto-scroll
     const scrollToBottom = () => {
@@ -47,24 +42,42 @@ const ChatCoach = () => {
         scrollToBottom();
     }, [messages, isTyping]);
 
-    // 3. Cargar historial persistente al montar; si está vacío, pedir saludo inicial
+    // Auto-envío del contexto de empleo tras recibir el saludo inicial
     useEffect(() => {
-        const loadHistoryOrGreet = async () => {
+        if (
+            messages.length === 1 &&
+            messages[0].id === 'init' &&
+            pendingJobPrepRef.current &&
+            sendMessageRef.current
+        ) {
+            const job = pendingJobPrepRef.current;
+            pendingJobPrepRef.current = null;
+            const location = [job.job_city, job.job_country].filter(Boolean).join(', ');
+            const prompt =
+                `Quiero prepararme para aplicar a esta oferta laboral:\n\n` +
+                `**Cargo:** ${job.job_title || 'No especificado'}\n` +
+                `**Empresa:** ${job.employer_name || 'No especificada'}\n` +
+                `**Ubicación:** ${location || 'No especificada'}\n` +
+                `**Tipo de contrato:** ${job.job_employment_type || 'No especificado'}\n` +
+                `**Descripción:** ${(job.job_description || 'No disponible').slice(0, 800)}\n\n` +
+                `¿Cómo debería prepararme para obtener este empleo? Dime qué habilidades técnicas y blandas debo destacar, qué podrían preguntarme en la entrevista y qué puedo mejorar según los requisitos.`;
+            sendMessageRef.current(null, prompt);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [messages]);
+
+    // 3. Saludo personalizado — GET /api/coach/init
+    // Usamos un flag `cancelled` para evitar que StrictMode (doble ejecución en dev)
+    // resetee el historial cuando la primera llamada llega después de que la segunda ya terminó.
+    useEffect(() => {
+        let cancelled = false;
+
+        const fetchInitGreeting = async () => {
             try {
                 setIsTyping(true);
-
-                // ── Paso 1: intentar cargar historial guardado en MySQL ──────────
-                const { data: historyData } = await axiosInstance.get('/coach/history');
-                const savedMessages = historyData?.history ?? [];
-
-                if (savedMessages.length > 0) {
-                    // Hay historial → restaurar conversación anterior
-                    setMessages(savedMessages);
-                    return; // No hace falta el saludo inicial
-                }
-
-                // ── Paso 2: sin historial → obtener saludo personalizado de Gemini ──
+                // axiosInstance inyecta el Authorization: Bearer <token> automáticamente
                 const { data } = await axiosInstance.get('/coach/init');
+                if (cancelled) return; // StrictMode cleanup: ignorar respuesta de la invocación obsoleta
                 const greetingText = data.reply || '¡Hola! Soy tu IA Coach de NEXT. ¿En qué te puedo ayudar?';
 
                 setMessages([{
@@ -73,38 +86,37 @@ const ChatCoach = () => {
                     sender: 'ai'
                 }]);
             } catch (error) {
-                console.error('[ChatCoach] Error al cargar historial o saludo:', error);
+                if (cancelled) return;
+                console.error('[ChatCoach] Error al obtener saludo inicial:', error);
+                // Fallback genérico si el endpoint falla
                 setMessages([{
                     id: 'init',
                     text: '¡Hola! Soy tu IA Coach de NEXT. Estoy listo para ayudarte con tu preparación profesional. ¿Empezamos?',
                     sender: 'ai'
                 }]);
             } finally {
-                setIsTyping(false);
+                if (!cancelled) setIsTyping(false);
             }
         };
 
-        loadHistoryOrGreet();
-        // Solo al montar — no incluir dependencias para que no se repita
+        fetchInitGreeting();
+
+        // Cleanup: marca la invocación como cancelada cuando StrictMode desmonta
+        return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // ── Cleanup al desmontar el componente ────────────────────────────────────
+    // ── FIX BUG 3: Cleanup al desmontar el componente ────────────────────────
     // Garantiza que el TTS y el micrófono se detengan al navegar a otra página
     useEffect(() => {
         return () => {
-            // Detener audio TTS si está sonando
-            if (currentAudioRef.current) {
-                currentAudioRef.current.pause();
-                currentAudioRef.current.src = '';
+            // Cancelar voz sintética inmediatamente al salir de la página
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
             }
-            // Detener grabación si está activa
-            if (mediaRecorderRef.current?.state === 'recording') {
-                mediaRecorderRef.current.stop();
-            }
-            // Cerrar tracks del micrófono
-            if (audioStreamRef.current) {
-                audioStreamRef.current.getTracks().forEach(t => t.stop());
+            // Detener el reconocimiento de voz si está activo
+            if (recognitionRef.current) {
+                recognitionRef.current.abort();
             }
             // Limpiar timer de silencio pendiente
             if (silenceTimerRef.current) {
@@ -113,117 +125,88 @@ const ChatCoach = () => {
         };
     }, []);
 
-    // STT via MediaRecorder + OpenAI Whisper — la lógica de grabación vive
-    // dentro de toggleListening() para no desperdiciar recursos al montar.
+    // 3. Inicializar Web Speech API (Recognition)
+    useEffect(() => {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            recognitionRef.current = new SpeechRecognition();
+            recognitionRef.current.continuous = true;
+            recognitionRef.current.lang = 'es-ES';
+            recognitionRef.current.interimResults = true;
+
+            recognitionRef.current.onresult = (event) => {
+                // Acumulador temporal para toda la sesión actual de voz
+                const sessionTranscript = Array.from(event.results)
+                    .map(result => result[0].transcript)
+                    .join('');
+
+                // 1. Mostrar texto acumulado en tiempo real en UI
+                if (isInterviewModeRef.current) {
+                    setInput(sessionTranscript);
+                } else {
+                    setInput((prevInputRef.current ? prevInputRef.current + ' ' : '') + sessionTranscript);
+                }
+
+                // 2. Limpiar timer anterior (Debounce)
+                if (silenceTimerRef.current) {
+                    clearTimeout(silenceTimerRef.current);
+                }
+
+                // 3. Iniciar nuevo timer de paciencia (1250ms = flujo conversacional natural)
+                silenceTimerRef.current = setTimeout(() => {
+                    const textToSend = sessionTranscript.trim();
+                    if (isInterviewModeRef.current && sendMessageRef.current && textToSend) {
+                        sendMessageRef.current(null, textToSend);
+                        setInput('');
+                        recognitionRef.current?.stop();
+                    } else if (!isInterviewModeRef.current) {
+                        // En chat normal, detener escucha y dejar texto listo para enviar
+                        recognitionRef.current?.stop();
+                    }
+                }, 1500);
+            };
+
+            recognitionRef.current.onerror = (event) => {
+                console.error("Error en Speech recognition: ", event.error);
+                setIsListening(false);
+                if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+            };
+
+            recognitionRef.current.onend = () => {
+                setIsListening(false);
+                if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+            };
+        } else {
+            console.warn("Speech Recognition API no soportada en este navegador.");
+        }
+    }, []);
 
     const toggleListening = () => {
         if (isListening) {
-            // Parada manual — el onstop del MediaRecorder maneja la transcripción
-            if (mediaRecorderRef.current?.state === 'recording') {
-                mediaRecorderRef.current.stop();
-            }
-            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+            recognitionRef.current?.stop();
             setIsListening(false);
-            return;
+            if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+        } else {
+            // Empezar a escuchar (O intentarlo solicitando permisos si es la primera vez)
+            try {
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel(); // Interrupción: detener al coach si el usuario empieza a hablar
+                }
+
+                // Pedir permiso explícitamente vía web navigator para asegurar UI si no se han resuelto
+                navigator.mediaDevices.getUserMedia({ audio: true }).then(() => {
+                    prevInputRef.current = input; // Guardamos lo que ya se había escrito
+                    recognitionRef.current?.start();
+                    setIsListening(true);
+                }).catch(err => {
+                    console.error("Permiso de micrófono denegado:", err);
+                    alert("Para la simulación necesitas otorgar permisos de Micrófono en el navegador.");
+                });
+
+            } catch (e) {
+                console.error(e);
+            }
         }
-
-        // Detener TTS si está sonando para no pisarse
-        if (currentAudioRef.current) {
-            currentAudioRef.current.pause();
-            currentAudioRef.current.src = '';
-            currentAudioRef.current = null;
-        }
-
-        navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
-            audioStreamRef.current = stream;
-            audioChunksRef.current = [];
-
-            const mediaRecorder = new MediaRecorder(stream);
-            mediaRecorderRef.current = mediaRecorder;
-
-            mediaRecorder.ondataavailable = (e) => {
-                if (e.data.size > 0) audioChunksRef.current.push(e.data);
-            };
-
-            mediaRecorder.onstop = async () => {
-                clearTimeout(maxRecordingTimer); // Cancelar el límite de 55s si paró antes
-                setIsListening(false);
-                stream.getTracks().forEach(t => t.stop());
-
-                const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-                if (blob.size < 1500) return; // demasiado corto, probablemente silencio
-
-                try {
-                    setIsTyping(true);
-                    const formData = new FormData();
-                    formData.append('audio', blob, 'audio.webm');
-
-                    const { data } = await axiosInstance.post('/coach/stt', formData, {
-                        headers: { 'Content-Type': 'multipart/form-data' },
-                    });
-
-                    const transcribedText = data.text?.trim();
-                    if (!transcribedText) { setIsTyping(false); return; }
-
-                    if (isInterviewModeRef.current && sendMessageRef.current) {
-                        sendMessageRef.current(null, transcribedText);
-                        setInput('');
-                    } else {
-                        setInput(prev => (prev ? prev + ' ' : '') + transcribedText);
-                        setIsTyping(false);
-                    }
-                } catch (err) {
-                    console.error('[STT] Error al transcribir:', err);
-                    setIsTyping(false);
-                }
-            };
-
-            mediaRecorder.start();
-            prevInputRef.current = input;
-            setIsListening(true);
-
-            // ── Límite de 55s: Google STT síncrono rechaza audio > 60s ──────
-            const maxRecordingTimer = setTimeout(() => {
-                if (mediaRecorderRef.current?.state === 'recording') {
-                    console.warn('[STT] Límite de 55s alcanzado. Deteniendo grabación automáticamente.');
-                    mediaRecorderRef.current.stop();
-                }
-            }, 55000);
-
-            // ── Detección de silencio via AudioContext ──────────────────────
-            const audioCtx = new AudioContext();
-            const analyser = audioCtx.createAnalyser();
-            const source = audioCtx.createMediaStreamSource(stream);
-            source.connect(analyser);
-            analyser.fftSize = 512;
-            const dataArray = new Uint8Array(analyser.frequencyBinCount);
-            let silentFrames = 0;
-
-            const checkSilence = () => {
-                if (!isListeningRef.current) { audioCtx.close(); return; }
-                analyser.getByteFrequencyData(dataArray);
-                const avg = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
-
-                if (avg < 8) {
-                    silentFrames++;
-                    if (silentFrames > 45) { // ~1.5 s a ~30fps
-                        if (mediaRecorderRef.current?.state === 'recording') {
-                            mediaRecorderRef.current.stop();
-                        }
-                        audioCtx.close();
-                        return;
-                    }
-                } else {
-                    silentFrames = 0;
-                }
-                requestAnimationFrame(checkSilence);
-            };
-            requestAnimationFrame(checkSilence);
-
-        }).catch(err => {
-            console.error("Permiso de micrófono denegado:", err);
-            alert("Para la simulación necesitas otorgar permisos de Micrófono en el navegador.");
-        });
     };
 
     // 4. Utilidad Anti-Markdown para TTS
@@ -238,35 +221,68 @@ const ChatCoach = () => {
             .trim();
     };
 
-    // 5. Función de Text-to-Speech — OpenAI TTS (voz natural, modelo tts-1-hd)
-    const speakText = async (text) => {
-        // Detener audio anterior si está sonando
-        if (currentAudioRef.current) {
-            currentAudioRef.current.pause();
-            currentAudioRef.current.src = '';
-            currentAudioRef.current = null;
-        }
+    // 5. Función de Text-to-Speech (Coach Voz) — voz masculina en español
+    const speakText = (text) => {
+        if (!('speechSynthesis' in window)) return;
 
+        window.speechSynthesis.cancel();
         const cleanText = cleanTextForSpeech(text);
-        if (!cleanText) return;
 
-        try {
-            const response = await axiosInstance.post('/coach/tts', { text: cleanText }, {
-                responseType: 'blob',
-            });
+        const utterance = new SpeechSynthesisUtterance(cleanText);
+        utterance.lang = 'es-ES';
+        utterance.rate = 0.95;
+        utterance.pitch = 0.85; // Tono bajo → percepción masculina
 
-            const audioUrl = URL.createObjectURL(response.data);
-            const audio = new Audio(audioUrl);
-            currentAudioRef.current = audio;
+        // Nombres comunes para voces masculinas en español (Chrome, Linux, Safari, Windows)
+        const MALE_VOICE_NAMES = [
+            'Jorge', 'Carlos', 'Diego', 'Pablo', 'Juan', 'Miguel',
+            'Enrique', 'Matias', 'Rodrigo', 'Martin', 'Alvaro', 'Andres',
+            'David', 'Jose', 'Google español de Estados Unidos', 'Google español',
+            'Spanish Male', 'Male', 'Español', 'es-us', 'es-mx', 'es-es'
+        ];
 
-            audio.onended = () => {
-                URL.revokeObjectURL(audioUrl);
-                currentAudioRef.current = null;
+        const assignVoice = () => {
+            const voices = window.speechSynthesis.getVoices();
+            if (voices.length === 0) return false;
+
+            // 1. Priorizar por nombres conocidos de hombre + idioma español
+            let selected = voices.find(v =>
+                v.lang.startsWith('es') &&
+                MALE_VOICE_NAMES.some(name => v.name.toLowerCase().includes(name.toLowerCase()))
+            );
+
+            // 2. Fallback: cualquier voz española que no sea claramente femenina
+            if (!selected) {
+                selected = voices.find(v =>
+                    v.lang.startsWith('es') &&
+                    (v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('hombre'))
+                ) || voices.find(v => v.lang.startsWith('es'));
+            }
+
+            if (selected) {
+                utterance.voice = selected;
+                // Si la voz parece femenina por nombre, bajamos el pitch para masculinizarla
+                const nameLow = selected.name.toLowerCase();
+                const isLikelyFemale = nameLow.includes('female') || nameLow.includes('woman') ||
+                    nameLow.includes('elena') || nameLow.includes('lucia') ||
+                    nameLow.includes('monica') || nameLow.includes('paulina') ||
+                    nameLow.includes('sabina') || nameLow.includes('helena');
+                utterance.pitch = isLikelyFemale ? 0.55 : 0.85;
+                console.debug('[TTS] Voz configurada (masculina):', selected.name);
+            } else {
+                utterance.pitch = 0.70; // Fallback grave para tono masculino
+            }
+            return true;
+        };
+
+        if (!assignVoice()) {
+            window.speechSynthesis.onvoiceschanged = () => {
+                assignVoice();
+                window.speechSynthesis.speak(utterance);
+                window.speechSynthesis.onvoiceschanged = null;
             };
-
-            await audio.play();
-        } catch (error) {
-            console.error('[TTS] Error al reproducir voz:', error);
+        } else {
+            window.speechSynthesis.speak(utterance);
         }
     };
 
@@ -284,15 +300,9 @@ const ChatCoach = () => {
         setIsTyping(true);
 
         try {
-            // En modo entrevista: enviar SOLO mensajes de esta sesión (desde interviewStartIndexRef)
-            // En modo coach: enviar todo el historial excluyendo el mensaje de bienvenida y errores
-            const historyToSend = isInterviewMode
-                ? messages.slice(interviewStartIndexRef.current).filter(m => !m.isError)
-                : messages.filter(m => m.id !== 'init' && !m.isError);
-
             const requestBody = {
                 message: textToSend,
-                history: historyToSend,
+                history: messages.filter(m => m.id !== 'init' && !m.isError),
                 isInterviewMode
             };
 
@@ -349,13 +359,6 @@ const ChatCoach = () => {
         setIsInterviewMode(true);
         setIsTyping(true);
 
-        // Guardar cuántos mensajes hay ANTES de que empiece la entrevista.
-        // Así el historial enviado a Gemini será exclusivo de esta sesión.
-        setMessages(prev => {
-            interviewStartIndexRef.current = prev.length;
-            return prev;
-        });
-
         try {
             // Reutilizamos /coach/init pero le indicamos al backend que es modo entrevista
             // a través de un query param para que el prompt sea el de reclutador
@@ -383,14 +386,9 @@ const ChatCoach = () => {
 
     // 8. Finalizar Simulación Forzosamente
     const stopInterview = async () => {
-        // Detener audio TTS y grabación inmediatamente
-        if (currentAudioRef.current) {
-            currentAudioRef.current.pause();
-            currentAudioRef.current.src = '';
-            currentAudioRef.current = null;
-        }
-        if (mediaRecorderRef.current?.state === 'recording') mediaRecorderRef.current.stop();
-        if (audioStreamRef.current) audioStreamRef.current.getTracks().forEach(t => t.stop());
+        // Detener voz y escucha inmediatamente
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        if (recognitionRef.current) recognitionRef.current.abort();
         setIsListening(false);
         setIsInterviewMode(false);
 
@@ -422,10 +420,7 @@ const ChatCoach = () => {
                 <div className="h-16 flex items-center px-4 sm:px-6 border-b border-gray-100 flex-shrink-0 gap-2">
                     <button
                         onClick={() => {
-                            if (currentAudioRef.current) {
-                                currentAudioRef.current.pause();
-                                currentAudioRef.current.src = '';
-                            }
+                            if ('speechSynthesis' in window) window.speechSynthesis.cancel();
                             navigate('/dashboard');
                         }}
                         className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-[#2563EB] transition-colors cursor-pointer flex-shrink-0"
@@ -505,6 +500,9 @@ const ChatCoach = () => {
                                             <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.3s]"></span>
                                             <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
                                             <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span>
+                                            <span className="text-xs text-gray-400 ml-1.5 font-medium">
+                                                Analizando respuesta...
+                                            </span>
                                         </div>
                                     </div>
                                 </div>

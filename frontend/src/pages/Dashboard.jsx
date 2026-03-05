@@ -348,7 +348,7 @@ const Dashboard = () => {
               <GrowthItem
                 label="Explorar vacantes afines"
                 boost="+2%"
-                onClick={() => { }}
+                onClick={() => navigate('/job-hunter')}
               />
             </div>
           </div>
@@ -391,15 +391,14 @@ const Dashboard = () => {
               </div>
               <p className="text-sm text-gray-500 mb-4 leading-relaxed">
                 Vacantes hechas para ti, no trabajos al azar.
-                <span className="ml-1.5 text-xs bg-purple-50 text-purple-500 border border-purple-100 px-2 py-0.5 rounded-full font-medium">Próximamente</span>
               </p>
-              <button
-                disabled
-                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white cursor-not-allowed opacity-50"
+              <Link
+                to="/job-hunter"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 hover:scale-[1.02] active:scale-[0.98]"
                 style={{ background: 'linear-gradient(to right, #7C3AED, #8B5CF6)' }}
               >
-                Explorar Vacantes
-              </button>
+                Explorar Vacantes <ChevronRight size={14} />
+              </Link>
             </div>
 
             <div className="hidden sm:flex w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-100 items-center justify-center flex-shrink-0">

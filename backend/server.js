@@ -11,6 +11,7 @@ import './models/Message.js'; // Registra el modelo y define la asociación User
 import authRoutes from './routes/authRoutes.js';
 import coachRoutes from './routes/coachRoutes.js';
 import userRoutes from './routes/userRoutes.js';
+import jobRoutes from './routes/jobRoutes.js';
 
 const app = express();
 
@@ -52,6 +53,7 @@ app.use(express.json());
 app.use('/api/auth', authRoutes);
 app.use('/api/coach', coachRoutes);
 app.use('/api/user', userRoutes);
+app.use('/api/jobs', jobRoutes); // Job HuNTER
 
 // ── Health checks para Render ─────────────────────────────────────────────────
 // Render hace un GET periódico para verificar que el servicio está vivo.
