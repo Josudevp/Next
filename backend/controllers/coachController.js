@@ -37,6 +37,14 @@ const GOAL_LABELS = {
     practice: 'Prepararse para entrevistas',
 };
 
+const EXPERIENCE_LEVEL_LABELS = {
+    'Sin experiencia': 'Sin experiencia laboral previa',
+    'Menos de 1 año': 'Menos de 1 año de experiencia',
+    '1-3 años': '1 a 3 años de experiencia',
+    '3-5 años': '3 a 5 años de experiencia',
+    'Más de 5 años': 'Más de 5 años de experiencia',
+};
+
 // ── Función que obtiene el perfil desde MySQL y construye el prompt ──────────
 // Añadimos isFirstMessage para controlar la máquina de estados
 const buildDynamicSystemPrompt = async (userId, isInterviewMode, isFirstMessage = false) => {
@@ -46,19 +54,23 @@ const buildDynamicSystemPrompt = async (userId, isInterviewMode, isFirstMessage 
 
     try {
         const user = await User.findByPk(userId, {
-            attributes: ['name', 'area', 'skills', 'goals', 'jobType']
+            attributes: ['name', 'area', 'skills', 'goals', 'jobType', 'experienceLevel', 'cvText']
         });
 
         if (!user) throw new Error('Usuario no encontrado en la DB');
 
         const areaLabel = AREA_LABELS[user.area] || user.area || 'área no especificada';
         const jobTypeLabel = JOB_TYPE_LABELS[user.jobType] || user.jobType || 'oportunidad laboral';
+        const experienceLevelLabel = EXPERIENCE_LEVEL_LABELS[user.experienceLevel] || user.experienceLevel || 'nivel de experiencia no especificado';
         const skills = Array.isArray(user.skills) && user.skills.length > 0
             ? user.skills.join(', ')
             : 'habilidades no especificadas';
         const goalsList = Array.isArray(user.goals) && user.goals.length > 0
             ? user.goals.map(g => GOAL_LABELS[g] || g).join(', ')
             : 'sin metas específicas aún';
+        const cvBlock = user.cvText
+            ? `\n\n                    CV DEL CANDIDATO (texto extraído automáticamente):\n                    ---\n                    ${user.cvText.slice(0, 8000)}\n                    ---\n                    Usa este CV para personalizar tus preguntas. Puedes hacer referencia a experiencias, empresas o proyectos mencionados en él.`
+            : '';
 
         if (isInterviewMode) {
             // Regla dinámica de estado: Si es el primer mensaje, saluda. Si no, prohibido saludar.
@@ -73,6 +85,9 @@ const buildDynamicSystemPrompt = async (userId, isInterviewMode, isFirstMessage 
                     PERFIL DEL CANDIDATO:
                     - Área: ${areaLabel}
                     - Habilidades: ${skills}
+                    - Nivel de experiencia: ${experienceLevelLabel}${cvBlock}
+
+                    IMPORTANTE: Ten en cuenta que el usuario tiene ${experienceLevelLabel}. Ajusta la dificultad de tus preguntas de entrevista y tus expectativas a este nivel exacto. Si es alguien sin experiencia o con poca experiencia, sé más pedagógico y enfócate en potencial; si tiene más experiencia, sé más exigente y espera respuestas más elaboradas.
 
                     ${stateRule}
 
@@ -101,7 +116,10 @@ const buildDynamicSystemPrompt = async (userId, isInterviewMode, isFirstMessage 
         }
 
         return `Eres el IA Coach de NEXT, una plataforma de empleabilidad. Hoy es ${todayDate}.
-                Hablas con ${user.name} (Área: ${areaLabel}, Skills: ${skills}, Metas: ${goalsList}, Tipo de trabajo buscado: ${jobTypeLabel}).
+                Hablas con ${user.name} (Área: ${areaLabel}, Skills: ${skills}, Metas: ${goalsList}, Tipo de trabajo buscado: ${jobTypeLabel}, Nivel de experiencia: ${experienceLevelLabel}).
+                ${cvBlock ? `\n                CONTEXTO DEL CV DEL USUARIO:\n                ---\n                ${user.cvText.slice(0, 8000)}\n                ---\n                Usa este CV para personalizar tus consejos, identificar brechas de habilidades y hacer referencias concretas a su experiencia real.` : ''}
+
+                IMPORTANTE: Ten en cuenta que el usuario tiene ${experienceLevelLabel}. Ajusta la dificultad de tus consejos laborales, explicaciones técnicas y recomendaciones a este nivel exacto. Si es alguien sin experiencia, sé más pedagógico y básico; si tiene más experiencia, asume conocimientos previos y profundiza más.
 
                 PERSONALIDAD: Profesional, empático y directo. Adapta tus respuestas al mercado laboral latinoamericano.
 

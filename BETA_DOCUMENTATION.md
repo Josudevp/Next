@@ -10,7 +10,7 @@ El objetivo de la Beta es ofrecer un flujo continuo y pulido (_pixel-perfect_, e
 
 ### Estructura de Datos Simulada (Local Storage)
 - **`next_user`**: Almacena `{ name, email }` (Datos permanentes de cuenta. ¡Nunca guarda la contraseña por seguridad!).
-- **`next_profile`**: Almacena todo el perfil del Onboarding `{ area, situation, jobType, skills[], goals[] }` (Datos de la ruta del usuario).
+- **`next_profile`**: Almacena todo el perfil del Onboarding `{ area, situation, jobType, skills[], goals[], experienceLevel }` (Datos de la ruta del usuario).
 - **`next_session`**: Almacena `'true'` cuando el usuario tiene una sesión activa (Token efímero para el guard de rutas).
 
 ---
@@ -97,3 +97,36 @@ Todo el frontend está modularizado de tal manera que reemplazar `localStorage` 
 4.  En `Dashboard.jsx` → Recuperar info desde `GET /api/users/me` y cálculo desde `GET /api/users/score`.
 
 La Beta queda de esta forma completamente **lista para ser demostrada, validada a nivel negocio y transicionada sin fricción a código Full-stack**.
+
+---
+
+## 🎯 Nivel de Experiencia (experienceLevel)
+
+Campo agregado para personalizar la experiencia del usuario según su trayectoria profesional.
+
+### Opciones Disponibles
+- **Sin experiencia**: Estudiantes o recién graduados sin experiencia laboral previa.
+- **Menos de 1 año**: Profesionales con experiencia inicial o prácticas.
+- **1-3 años**: Profesionales junior con experiencia consolidada.
+- **3-5 años**: Profesionales mid-level con trayectoria establecida.
+- **Más de 5 años**: Profesionales senior o expertos en su campo.
+
+### Integración en el Sistema
+
+1.  **Base de Datos (`User.js`)**: Campo `experienceLevel` tipo STRING con valor por defecto "Sin experiencia".
+
+2.  **Frontend (`ProfileEdit.jsx`)**: Select dropdown que permite al usuario actualizar su nivel de experiencia.
+
+3.  **Job Hunter (`jobController.js`)**: El nivel de experiencia se traduce a términos de búsqueda en inglés para JSearch:
+    | Nivel ES | Término de búsqueda |
+    |----------|---------------------|
+    | Sin experiencia | entry level OR internship |
+    | Menos de 1 año | junior |
+    | 1-3 años | mid level OR associate |
+    | 3-5 años | senior OR experienced |
+    | Más de 5 años | lead OR principal OR staff |
+
+4.  **IA Coach (`coachController.js`)**: El nivel de experiencia se inyecta en el system prompt de Gemini, ajustando automáticamente:
+    - La dificultad de las preguntas en simulaciones de entrevista.
+    - La profundidad y complejidad de los consejos laborales.
+    - Las expectativas según el nivel del candidato.

@@ -114,7 +114,7 @@ const JobCard = ({ job }) => {
 
       {/* Descripción (overflow truncado) */}
       {job.job_description && (
-        <p className="text-xs text-gray-500 leading-relaxed line-clamp-3">
+        <p className="text-xs text-gray-500 leading-relaxed line-clamp-3 break-words">
           {job.job_description.replace(/\n+/g, ' ').trim()}
         </p>
       )}
@@ -249,7 +249,7 @@ const JobHunter = () => {
       const { data } = await axiosInstance.get('/jobs/search', { params })
       setJobs(data.jobs || [])
       setIsCached(data.cached || false)
-      setActiveQuery(query.trim() || DEFAULT_QUERY)
+      setActiveQuery(data.activeQuery || query.trim() || DEFAULT_QUERY)
     } catch (err) {
       const msg = err.response?.data?.error || 'No se pudo conectar con el servidor. Verifica tu conexión.'
       setError(msg)
@@ -287,7 +287,7 @@ const JobHunter = () => {
 
       {/* ════════════════ NAV ════════════════ */}
       <nav className="bg-white border-b border-gray-100 sticky top-0 z-40 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center gap-4">
+        <div className="max-w-6xl mx-auto px-3 sm:px-6 h-16 flex items-center gap-4">
           <Link
             to="/dashboard"
             className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-700 transition-colors"

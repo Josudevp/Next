@@ -12,6 +12,7 @@ const Onboarding = lazy(() => import('./pages/Onboarding'))
 const Dashboard  = lazy(() => import('./pages/Dashboard'))
 const IACoach    = lazy(() => import('./pages/IACoach'))
 const JobHunter  = lazy(() => import('./pages/JobHunter'))
+const ProfilePage = lazy(() => import('./pages/ProfilePage'))
 
 // ── Guardia de rutas ──────────────────────────────────────────────────────────
 import ProtectedRoute from './components/ProtectedRoute'
@@ -101,6 +102,9 @@ function App() {
             } />
             <Route path="/job-hunter" element={
               <ProtectedRoute><JobHunter /></ProtectedRoute>
+            } />
+            <Route path="/profile" element={
+              <ProtectedRoute><ProfilePage /></ProtectedRoute>
             } />
 
           </Routes>

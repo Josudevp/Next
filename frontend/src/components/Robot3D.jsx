@@ -106,7 +106,7 @@ export default function Robot3D() {
   }
 
   return (
-    <div ref={containerRef} className="w-full h-full min-h-[500px] flex justify-center items-center relative overflow-hidden">
+    <div ref={containerRef} className="w-full h-full min-h-[280px] sm:min-h-[380px] md:min-h-[500px] flex justify-center items-center relative overflow-hidden">
       {canRender && (
         <div className="w-full h-[120%] absolute -top-[5%]">
           <SplineErrorBoundary>

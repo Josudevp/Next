@@ -73,7 +73,7 @@ app.get('/health', (_req, res) => {
 
 // ── Sincronización con la BD y arranque ──────────────────────────────────────
 sequelize
-  .sync({ alter: true })
+  .sync({ alter: false })
   .then(() => console.log('✅ Tablas de NEXT sincronizadas'))
   .catch((err) => console.log('❌ Error al sincronizar:', err));
 

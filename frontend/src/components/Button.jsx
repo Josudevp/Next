@@ -30,7 +30,7 @@ const Button = ({
             aria-busy={loading}
             className={`
                 inline-flex items-center justify-center gap-2
-                px-14 py-3 md:py-4 rounded-2xl md:rounded-4xl
+                px-6 sm:px-14 py-3 md:py-4 rounded-2xl md:rounded-4xl
                 font-semibold text-sm md:text-base
                 text-white bg-linear-to-r from-[#1B49AE] from-40% via-[#3473FF] via-80% to-next-primary to-100%
                 transition-all duration-200

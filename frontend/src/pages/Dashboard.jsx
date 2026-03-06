@@ -3,10 +3,9 @@ import { useNavigate, Link } from 'react-router-dom'
 import API_URL from '../api/api'
 import {
   Bell, ChevronRight, Lightbulb, Bot,
-  Briefcase, TrendingUp, RefreshCw, LogOut, User as UserIcon, Settings, HelpCircle
+  Briefcase, TrendingUp, LogOut, User as UserIcon, HelpCircle
 } from 'lucide-react'
 import LogoNext from '../components/LogoNext'
-import ProfileEdit from '../components/ProfileEdit'
 import axiosInstance from '../api/axiosInstance'
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -53,7 +52,7 @@ const CircularProgress = ({ percentage }) => {
 }
 
 // ─── Avatar con iniciales ─────────────────────────────────────────────────────
-const UserAvatar = ({ name, onLogout, onEditProfile }) => {
+const UserAvatar = ({ name, onLogout, onGoToProfile }) => {
   const [open, setOpen] = useState(false)
   const initials = name
     .split(' ')
@@ -80,7 +79,7 @@ const UserAvatar = ({ name, onLogout, onEditProfile }) => {
           </div>
 
           <button
-            onClick={() => { onEditProfile(); setOpen(false); }}
+            onClick={() => { onGoToProfile(); setOpen(false); }}
             className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-gray-600 hover:bg-blue-50 hover:text-blue-600 transition-colors cursor-pointer"
           >
             <UserIcon size={14} /> Mi Perfil
@@ -121,7 +120,6 @@ const Dashboard = () => {
   const [profile, setProfile] = useState(null)
   const [score, setScore] = useState(0)
   const [animatedScore, setAnimatedScore] = useState(0)
-  const [isEditingProfile, setIsEditingProfile] = useState(false)
 
   // ── Auth guard + carga de datos remotos ──────────────────────────────────
   useEffect(() => {
@@ -220,7 +218,7 @@ const Dashboard = () => {
                 NAV — Logo + Acciones
             ════════════════════════════════════════════════════ */}
       <nav className="bg-white border-b border-gray-100 sticky top-0 z-40 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
-        <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between">
           <LogoNext />
           <div className="flex items-center gap-3">
             {/* Notificaciones — estático para Beta */}
@@ -235,7 +233,7 @@ const Dashboard = () => {
             <UserAvatar
               name={user.name}
               onLogout={handleLogout}
-              onEditProfile={() => setIsEditingProfile(!isEditingProfile)}
+              onGoToProfile={() => navigate('/profile')}
             />
           </div>
         </div>
@@ -245,32 +243,6 @@ const Dashboard = () => {
                 CONTENIDO PRINCIPAL
             ════════════════════════════════════════════════════ */}
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 space-y-6">
-
-        {/* ── SECCIÓN DE EDICIÓN DE PERFIL (Toggleable) ── */}
-        {isEditingProfile && (
-          <section className="animate-fade-in-up mb-10 overflow-hidden">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-                <Settings size={20} className="text-blue-600" /> Configuración de Perfil
-              </h3>
-              <button
-                onClick={() => setIsEditingProfile(false)}
-                className="text-sm text-gray-400 hover:text-gray-600 font-medium cursor-pointer"
-              >
-                Cerrar editor
-              </button>
-            </div>
-            <ProfileEdit onProfileUpdated={(updatedUser) => {
-              setProfile(updatedUser);
-              setScore(updatedUser.score);
-              // Actualizamos también el localStorage para persistencia visual inmediata
-              localStorage.setItem('next_user', JSON.stringify({
-                name: updatedUser.name,
-                email: updatedUser.email
-              }));
-            }} />
-          </section>
-        )}
 
         {/* ── SALUDO ──────────────────────────────────── */}
         <section className="animate-fade-in-up">

@@ -7,7 +7,8 @@ const ProfileEdit = ({ onProfileUpdated }) => {
         area: '',
         skills: [],
         goals: [],
-        jobType: ''
+        jobType: '',
+        experienceLevel: 'Sin experiencia'
     });
 
     const [skillInput, setSkillInput] = useState('');
@@ -33,7 +34,8 @@ const ProfileEdit = ({ onProfileUpdated }) => {
                     area: data.area || '',
                     skills: data.skills || [],
                     goals: data.goals || [],
-                    jobType: data.jobType || ''
+                    jobType: data.jobType || '',
+                    experienceLevel: data.experienceLevel || 'Sin experiencia'
                 });
 
             } catch (error) {
@@ -44,7 +46,8 @@ const ProfileEdit = ({ onProfileUpdated }) => {
                     area: localProfile.area || '',
                     skills: localProfile.skills || [],
                     goals: localProfile.goals || [],
-                    jobType: localProfile.jobType || ''
+                    jobType: localProfile.jobType || '',
+                    experienceLevel: localProfile.experienceLevel || 'Sin experiencia'
                 });
             } finally {
                 setIsLoading(false);
@@ -161,6 +164,23 @@ const ProfileEdit = ({ onProfileUpdated }) => {
                         placeholder="Ej. Desarrollo Web, Marketing, Diseño UX..."
                         className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all"
                     />
+                </div>
+
+                {/* -- Select Nivel de Experiencia -- */}
+                <div className="flex flex-col gap-1.5">
+                    <label className="text-sm font-semibold text-gray-700">Nivel de experiencia</label>
+                    <select
+                        name="experienceLevel"
+                        value={formData.experienceLevel}
+                        onChange={handleChange}
+                        className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all cursor-pointer"
+                    >
+                        <option value="Sin experiencia">Sin experiencia</option>
+                        <option value="Menos de 1 año">Menos de 1 año</option>
+                        <option value="1-3 años">1-3 años</option>
+                        <option value="3-5 años">3-5 años</option>
+                        <option value="Más de 5 años">Más de 5 años</option>
+                    </select>
                 </div>
 
                 {/* -- Habilidades (Chips) -- */}

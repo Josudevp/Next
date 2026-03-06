@@ -35,6 +35,19 @@ const User = sequelize.define('User', {
   jobType: {
     type: DataTypes.STRING,
     allowNull: true
+  },
+  experienceLevel: {
+    type: DataTypes.STRING,
+    allowNull: true,
+    defaultValue: 'Sin experiencia'
+  },
+  profilePicture: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  cvText: {
+    type: DataTypes.TEXT('long'),
+    allowNull: true
   }
 });
 
