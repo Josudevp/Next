@@ -16,6 +16,7 @@ const ProfilePage = lazy(() => import('./pages/ProfilePage'))
 
 // ── Guardia de rutas ──────────────────────────────────────────────────────────
 import ProtectedRoute from './components/ProtectedRoute'
+import OnboardingRoute from './components/OnboardingRoute'
 
 // ── Loader mínimo de navegación entre rutas ───────────────────────────────────
 const PageLoader = () => (
@@ -92,10 +93,13 @@ function App() {
 
             {/* ── Rutas PRIVADAS — requieren next_token + next_session ── */}
             <Route path="/onboarding" element={
-              <ProtectedRoute><Onboarding /></ProtectedRoute>
+              <OnboardingRoute><Onboarding /></OnboardingRoute>
             } />
             <Route path="/dashboard" element={
               <ProtectedRoute><Dashboard /></ProtectedRoute>
+            } />
+            <Route path="/coach" element={
+              <ProtectedRoute><IACoach /></ProtectedRoute>
             } />
             <Route path="/ia-coach" element={
               <ProtectedRoute><IACoach /></ProtectedRoute>

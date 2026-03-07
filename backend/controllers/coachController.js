@@ -5,6 +5,9 @@ import Message from '../models/Message.js';
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
+// ── Áreas con perfil tecnológico (piden GitHub / Portafolio) ───────────────
+const TECH_AREAS = new Set(['tech', 'engineering', 'science', 'design']);
+
 // ── Catálogo de etiquetas legibles ──────────
 const AREA_LABELS = {
     tech: 'Tecnología e Informática',
@@ -196,6 +199,45 @@ const buildModel = (isReport, isInterview, systemPrompt) => {
     }, { apiVersion: 'v1beta' }); // Aseguramos v1beta para soporte completo de systemInstruction
 };
 
+const buildCvGenerationPrompt = async (userId, isFirstMessage = false) => {
+    try {
+        const user = await User.findByPk(userId, {
+            attributes: ['name', 'area', 'experienceLevel'],
+        });
+
+        if (!user) throw new Error('Usuario no encontrado');
+
+        const isTechArea = TECH_AREAS.has(user.area);
+        const hasExperience = user.experienceLevel && user.experienceLevel !== 'Sin experiencia';
+        const areaLabel = AREA_LABELS[user.area] || user.area || 'área no especificada';
+
+        const contactDataBlock = isTechArea
+            ? `   - Nombre completo\n   - Teléfono/Celular\n   - LinkedIn (URL o usuario)\n   - GitHub (URL o usuario)\n   - Portafolio web (URL, si tiene)`
+            : `   - Nombre completo\n   - Teléfono/Celular\n   - LinkedIn (URL o usuario)`;
+
+        const experienceBlock = hasExperience
+            ? `4. **Experiencia Laboral**: Para cada experiencia pregunta: empresa, cargo, fechas (inicio-fin) y 1-2 logros o responsabilidades clave. Si tiene varias, recoge una a la vez.`
+            : `4. **Proyectos Relevantes** (el usuario no tiene experiencia formal): Pregunta por proyectos universitarios, trabajos independientes o voluntariados. Para cada uno: nombre, descripción breve, tecnologías/herramientas y fechas aproximadas. En el JSON final usa la clave "projects" y pon "hasExperience": false.`;
+
+        const jsonExperienceField = hasExperience
+            ? `"experience": [\n    { "company": "...", "position": "...", "dates": "...", "description": "..." }\n  ],`
+            : `"projects": [\n    { "name": "...", "description": "...", "tech": "...", "dates": "..." }\n  ],`;
+
+        const jsonContactExtra = isTechArea
+            ? `    "github": "...",\n    "portfolio": "...",`
+            : '';
+
+        const stateRule = isFirstMessage
+            ? 'ESTADO ACTUAL — PRIMER TURNO: Saluda en una sola frase y pregunta exactamente si desea activar el Modo de Creación Asistida. No preguntes nada más todavía.'
+            : 'ESTADO ACTUAL — CONVERSACIÓN EN CURSO: NO vuelvas a saludar. Continúa según el paso pendiente y respetando el flujo de aprobación del modo asistido si fue activado.';
+
+        return `Eres el asistente experto en creación de CVs profesionales de la plataforma NEXT.\nHablas con ${user.name} (Área: ${areaLabel}).\n\nOBJETIVO: Recolectar toda la información necesaria para un CV minimalista en formato Harvard mediante un diálogo estructurado, amigable y eficiente.\n\nREGLA FUNDAMENTAL: Haz UNA SOLA pregunta o solicitud por turno. Nunca mezcles pasos.\n\nPASO 0 OBLIGATORIO — MODO ASISTIDO:\nLa primera pregunta debe ser exactamente esta idea, en español natural: \"¿Deseas activar el Modo de Creación Asistida? En este modo, tomaré tus respuestas básicas y las potenciaré para que suenen más profesionales antes de agregarlas al CV.\"\n- Si el usuario responde que sí: activa internamente assistedMode = true.\n- Si el usuario responde que no: activa internamente assistedMode = false.\n- Nunca vuelvas a preguntar por esto después de que el usuario responda.\n\nPASO 0.5 — FOTO:\nJusto después de resolver el modo asistido, pregunta exactamente esto: \"¿Te gustaría incluir tu foto de perfil actual en el documento?\"\n- Si el usuario responde que sí: guarda internamente includePhoto = true.\n- Si el usuario responde que no: guarda internamente includePhoto = false.\n- No vuelvas a preguntar por la foto después de recibir la respuesta.\n\nORDEN DE RECOLECCIÓN (después del paso 0.5, sigue este orden estrictamente):\n1. **Datos de contacto**:\n${contactDataBlock}\n2. **Resumen / Perfil Profesional**: Pide que se describa en 2-3 oraciones: quién es profesionalmente y qué lo diferencia.\n3. **Educación**: Institución, título/carrera y fechas (inicio-fin o «En curso»). Si tiene más de una, recoge una a la vez.\n${experienceBlock}\n5. **Habilidades**:\n   - Técnicas (herramientas, software, lenguajes, etc.)\n   - Blandas (comunicación, liderazgo, trabajo en equipo, etc.)\n\nLÓGICA DEL MODO ASISTIDO:\n- Aplica SOLO si assistedMode = true.\n- Para estas secciones: Resumen, Experiencia/Proyectos y Habilidades, NO avances a la siguiente sección inmediatamente después de la respuesta del usuario.\n- Primero reescribe y mejora su contenido con tono profesional, claro y convincente.\n- Luego responde con esta estructura: \"Aquí tienes una versión mejorada de lo que me dijiste: [Texto Potenciado]. ¿Te parece bien o quieres cambiarle algo?\"\n- Solo cuando el usuario confirme explícitamente con algo equivalente a \"sí\", \"me gusta\", \"está bien\", \"dale\", \"perfecto\" o similar, guarda esa versión mejorada y avanza al siguiente paso.\n- Si el usuario quiere cambios, ajusta el texto y vuelve a pedir aprobación.\n- En modo asistido, el JSON final debe usar siempre la versión aprobada, no el borrador original del usuario.\n\nMANEJO DE RESPUESTAS:\n- Si el usuario dice que no tiene algún dato (ej. LinkedIn), acéptalo sin insistir y pasa al siguiente dato requerido.\n- Sé conversacional y muy breve en las transiciones.\n- Si una respuesta es ambigua, pide una única aclaración.\n- Si el usuario no tiene experiencia laboral, trabaja con proyectos relevantes y usa la clave \"projects\" en el JSON final.\n\nFINALIZACIÓN:\nCuando hayas recolectado TODOS los datos necesarios (o el usuario haya indicado que no tiene más información), genera el JSON final CON ESTE FORMATO EXACTO, entre los tags especiales, sin texto adicional después del tag de cierre:\n\n[CV_FINAL_DATA]\n{\n  "personalInfo": {\n    "name": "...",\n    "phone": "...",\n    "email": "",\n    "linkedin": "...",\n${jsonContactExtra}  },\n  "includePhoto": true,\n  "summary": "...",\n  "education": [\n    { "institution": "...", "degree": "...", "dates": "...", "description": "" }\n  ],\n  ${jsonExperienceField}\n  "skills": {\n    "technical": ["..."],\n    "soft": ["..."]\n  },\n  "hasExperience": ${hasExperience}\n}\n[/CV_FINAL_DATA]\n\n${stateRule}`;
+    } catch (error) {
+        console.error('[buildCvGenerationPrompt] Error:', error.message);
+        return `Eres el asistente de creación de CVs de NEXT. Primero pregunta si el usuario desea activar el Modo de Creación Asistida y luego si quiere incluir su foto de perfil actual. Después recolecta datos una pregunta a la vez en este orden: datos de contacto, resumen, educación, experiencia o proyectos, habilidades. Si el modo asistido está activo, mejora resumen, experiencia/proyectos y habilidades, pide aprobación y solo entonces avanza. Al finalizar, genera un JSON entre tags [CV_FINAL_DATA]...[/CV_FINAL_DATA] incluyendo includePhoto.`;
+    }
+};
+
 // ══════════════════════════════════════════════════════════════════════════════
 // GET /api/coach/history  → Devuelve los últimos 50 mensajes del usuario
 // ══════════════════════════════════════════════════════════════════════════════
@@ -231,10 +273,17 @@ export const initCoach = async (req, res) => {
     try {
         const userId = req.user.userId;
         const isInterviewMode = req.query.mode === 'interview';
+        const isCvMode       = req.query.mode === 'createcv';
 
         // isFirstMessage = true
-        const systemPrompt = await buildDynamicSystemPrompt(userId, isInterviewMode, true);
-        const model = buildModel(false, isInterviewMode, systemPrompt);
+        let systemPrompt;
+        if (isCvMode) {
+            systemPrompt = await buildCvGenerationPrompt(userId, true);
+        } else {
+            systemPrompt = await buildDynamicSystemPrompt(userId, isInterviewMode, true);
+        }
+
+        const model = buildModel(false, isCvMode ? false : isInterviewMode, systemPrompt);
 
         const chat = model.startChat({ history: [] });
 
@@ -258,20 +307,26 @@ export const initCoach = async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 export const chatWithCoach = async (req, res) => {
     try {
-        const { message, history, isInterviewMode, finishSimulation } = req.body;
+        const { message, history, isInterviewMode, finishSimulation, isCvMode } = req.body;
         const userId = req.user.userId;
 
         if (!message && !finishSimulation) {
             return res.status(400).json({ error: 'El campo message es requerido.' });
         }
 
-        const isReportRequest = finishSimulation ||
+        const isReportRequest = !isCvMode && (finishSimulation ||
             message?.toLowerCase().includes('reporte') ||
-            message?.toLowerCase().includes('finalizar simulación');
+            message?.toLowerCase().includes('finalizar simulación'));
 
         // isFirstMessage = false (ya estamos en el loop del chat)
-        const systemPrompt = await buildDynamicSystemPrompt(userId, isInterviewMode || false, false);
-        const model = buildModel(isReportRequest, isInterviewMode || false, systemPrompt);
+        let systemPrompt;
+        if (isCvMode) {
+            systemPrompt = await buildCvGenerationPrompt(userId, false);
+        } else {
+            systemPrompt = await buildDynamicSystemPrompt(userId, isInterviewMode || false, false);
+        }
+
+        const model = buildModel(isReportRequest, isCvMode ? false : (isInterviewMode || false), systemPrompt);
 
         // Limpieza de historial: solo roles 'user' y 'model' válidos
         let cleanedHistory = (history || [])
@@ -294,9 +349,8 @@ export const chatWithCoach = async (req, res) => {
             : message;
 
         // ── Guardar mensaje del usuario en la BD ─────────────────────────────
-        // El reporte final (finishSimulation=true) siempre se persiste aunque
-        // venga del modo entrevista, para que sobreviva al recargar la página.
-        if ((!isInterviewMode || finishSimulation) && message) {
+        // El reporte final (finishSimulation=true) y el modo CV siempre se persisten.
+        if ((!isInterviewMode || finishSimulation || isCvMode) && message) {
             await Message.create({ userId, sender: 'user', text: message });
         }
 
@@ -326,8 +380,8 @@ export const chatWithCoach = async (req, res) => {
         }
 
         // ── Guardar respuesta de la IA en la BD ──────────────────────────────
-        // Igual que arriba: el reporte siempre se persiste.
-        if (!isInterviewMode || finishSimulation) {
+        // El reporte final y el modo CV siempre se persisten.
+        if (!isInterviewMode || finishSimulation || isCvMode) {
             await Message.create({ userId, sender: 'ai', text: replyText });
         }
 

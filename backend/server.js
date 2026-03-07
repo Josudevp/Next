@@ -12,6 +12,7 @@ import authRoutes from './routes/authRoutes.js';
 import coachRoutes from './routes/coachRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import jobRoutes from './routes/jobRoutes.js';
+import cvRoutes from './routes/cvRoutes.js';
 
 const app = express();
 
@@ -54,6 +55,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/coach', coachRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/jobs', jobRoutes); // Job HuNTER
+app.use('/api/cv', cvRoutes);    // CV Generator
 
 // ── Health checks para Render ─────────────────────────────────────────────────
 // Render hace un GET periódico para verificar que el servicio está vivo.

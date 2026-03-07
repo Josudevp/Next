@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
     ArrowLeft, Save, Camera, Upload, X, Plus,
-    FileText, CheckCircle, AlertCircle, Loader2, Trash2
+    FileText, CheckCircle, AlertCircle, Loader2, Trash2, Wand2
 } from 'lucide-react'
 import LogoNext from '../components/LogoNext'
 import axiosInstance from '../api/axiosInstance'
@@ -396,6 +396,18 @@ const ProfilePage = () => {
                             onFileChange={setCvFile}
                             onClear={() => setCvFile(null)}
                         />
+
+                        {/* Crear CV con IA — CTA secundario */}
+                        <div className="mt-3 pt-3 border-t border-gray-100">
+                            <button
+                                type="button"
+                                onClick={() => navigate('/coach?mode=createcv')}
+                                className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-[#1B49AE] border border-[#1B49AE]/25 bg-blue-50/60 hover:bg-blue-100/60 rounded-xl px-4 py-2.5 transition-all cursor-pointer"
+                            >
+                                <Wand2 size={15} />
+                                Crear CV con IA
+                            </button>
+                        </div>
                     </section>
 
                     {/* ── Sección 3: Datos del perfil ──────────────────── */}

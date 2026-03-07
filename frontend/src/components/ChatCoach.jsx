@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-import { Bot, Send, User, Loader2, ChevronLeft, Mic, MicOff, PlayCircle, SquareSquare, Activity } from 'lucide-react';
+import { Bot, Send, User, Loader2, ChevronLeft, Mic, MicOff, PlayCircle, SquareSquare, Activity, CheckCircle, AlertCircle } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useNavigate, useLocation } from 'react-router-dom';
 import LogoNext from '../components/LogoNext';
@@ -10,11 +10,17 @@ const ChatCoach = () => {
     const navigate = useNavigate();
     const location = useLocation();
 
+    // Detectar modo creación de CV desde query param ?mode=createcv
+    const isCvMode = new URLSearchParams(location.search).get('mode') === 'createcv';
+
     // Job HuNTER: si venimos con datos de un empleo, prepara el prompt automático
     const pendingJobPrepRef = useRef(location.state?.jobPrep || null);
 
     // 1. Estados
     const [isInterviewMode, setIsInterviewMode] = useState(false);
+
+    // null = sin modal | { status: 'generating' | 'ready' | 'error' }
+    const [cvModal, setCvModal] = useState(null);
 
     // El chat empieza vacío — el /init endpoint genera el saludo personalizado
     const [messages, setMessages] = useState([]);
@@ -75,11 +81,12 @@ const ChatCoach = () => {
         const fetchInitGreeting = async () => {
             try {
                 setIsTyping(true);
-                // axiosInstance inyecta el Authorization: Bearer <token> automáticamente
-                const { data } = await axiosInstance.get('/coach/init');
+                const modeParam = isCvMode ? '?mode=createcv' : '';
+                const { data } = await axiosInstance.get(`/coach/init${modeParam}`);
                 if (cancelled) return; // StrictMode cleanup: ignorar respuesta de la invocación obsoleta
-                const greetingText = data.reply || '¡Hola! Soy tu IA Coach de NEXT. ¿En qué te puedo ayudar?';
-
+                const greetingText = data.reply || (isCvMode
+                    ? '¡Hola! Soy tu asistente de creación de CV de NEXT. Empieza contándome tu nombre completo.'
+                    : '¡Hola! Soy tu IA Coach de NEXT. ¿En qué te puedo ayudar?');
                 setMessages([{
                     id: 'init',
                     text: greetingText,
@@ -91,7 +98,9 @@ const ChatCoach = () => {
                 // Fallback genérico si el endpoint falla
                 setMessages([{
                     id: 'init',
-                    text: '¡Hola! Soy tu IA Coach de NEXT. Estoy listo para ayudarte con tu preparación profesional. ¿Empezamos?',
+                    text: isCvMode
+                        ? '¡Hola! Soy tu asistente de creación de CV de NEXT. Empieza contándome tu nombre completo.'
+                        : '¡Hola! Soy tu IA Coach de NEXT. Estoy listo para ayudarte con tu preparación profesional. ¿Empezamos?',
                     sender: 'ai'
                 }]);
             } finally {
@@ -286,6 +295,30 @@ const ChatCoach = () => {
         }
     };
 
+    // 6.5  Genera y descarga el archivo Word del CV llamando al backend
+    const generateAndDownloadCv = async (cvData) => {
+        try {
+            const response = await axiosInstance.post('/cv/generate', cvData, {
+                responseType: 'blob',
+            });
+            const blob = new Blob([response.data], {
+                type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            });
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = `CV_${(cvData.personalInfo?.name || 'MiCV').replace(/\s+/g, '_')}.docx`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            setCvModal({ status: 'ready' });
+        } catch (err) {
+            console.error('[generateAndDownloadCv]', err);
+            setCvModal({ status: 'error' });
+        }
+    };
+
     // 6. Función para enviar mensajes (Chat normal o Simulación)
     const sendMessage = async (e, textOverride = null) => {
         e?.preventDefault();
@@ -303,12 +336,36 @@ const ChatCoach = () => {
             const requestBody = {
                 message: textToSend,
                 history: messages.filter(m => m.id !== 'init' && !m.isError),
-                isInterviewMode
+                isInterviewMode,
+                isCvMode,
             };
 
             // El interceptor adjunta el token y gestiona el error 401 automáticamente
             const { data } = await axiosInstance.post('/coach/chat', requestBody);
             const aiReplyText = data.reply || 'No pude procesar tu solicitud, intenta de nuevo';
+
+            // ── Detección de datos finales de CV ─────────────────────────────
+            if (isCvMode && aiReplyText.includes('[CV_FINAL_DATA]')) {
+                const match = aiReplyText.match(/\[CV_FINAL_DATA\]([\s\S]*?)\[\/CV_FINAL_DATA\]/);
+                if (match) {
+                    try {
+                        const cvJson = JSON.parse(match[1].trim());
+                        const cleanReply = aiReplyText.split('[CV_FINAL_DATA]')[0].trim() ||
+                            '¡Perfecto! He recolectado toda la información. Generando tu CV profesional ahora...';
+                        setMessages(prev => [...prev, {
+                            id: (Date.now() + 1).toString(),
+                            text: cleanReply,
+                            sender: 'ai',
+                        }]);
+                        setCvModal({ status: 'generating' });
+                        generateAndDownloadCv(cvJson);
+                        return; // finally{} aún ejecuta setIsTyping(false)
+                    } catch (parseErr) {
+                        console.error('[ChatCoach] CV JSON parse error:', parseErr);
+                        // fall-through: mostrar el mensaje normal
+                    }
+                }
+            }
 
             // Añadir la respuesta de la IA
             const aiMsg = {
@@ -356,6 +413,7 @@ const ChatCoach = () => {
 
     // 7. Activar Modo Simulación — saludo personalizado vía Gemini
     const startInterview = async () => {
+        if (isCvMode) return; // No permitir entrevista en modo CV
         setIsInterviewMode(true);
         setIsTyping(true);
 
@@ -411,6 +469,7 @@ const ChatCoach = () => {
     };
 
     return (
+        <>
         <div className="flex w-full h-[100dvh] bg-white font-sans overflow-hidden fixed inset-0">
 
             {/* ── COLUMNA IZQUIERDA (60%): CHAT & INPUT ── */}
@@ -431,7 +490,11 @@ const ChatCoach = () => {
 
                     {/* Botón de simulación — solo visible en móvil (lg:hidden) */}
                     <div className="lg:hidden flex-1 flex justify-center">
-                        {isInterviewMode ? (
+                        {isCvMode ? (
+                            <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full">
+                                Creando tu Hoja de Vida
+                            </span>
+                        ) : isInterviewMode ? (
                             <button
                                 onClick={stopInterview}
                                 className="flex items-center gap-1.5 text-xs font-semibold text-red-500 border border-red-200 bg-red-50 hover:bg-red-100 px-3 py-1.5 rounded-full transition-all cursor-pointer"
@@ -613,6 +676,11 @@ const ChatCoach = () => {
                                 Modo: Entrevista Técnica
                             </div>
                         )}
+                        {isCvMode && (
+                            <div className="bg-emerald-500/10 text-emerald-300 border border-emerald-500/20 px-3 py-1.5 rounded-full text-[11px] font-bold uppercase tracking-widest w-max animate-fade-in-up">
+                                Modo: Crear CV
+                            </div>
+                        )}
                     </div>
                 </div>
 
@@ -634,28 +702,42 @@ const ChatCoach = () => {
                 {/* Panel de Acción Inferior */}
                 <div className="absolute bottom-8 left-8 right-8 z-10">
                     <div className="bg-white/5 backdrop-blur-xl border border-white/10 p-6 rounded-[2rem] text-center shadow-2xl">
-                        <h3 className="text-white text-lg font-bold mb-2">Simulador de Entrevistas</h3>
-                        <p className="text-gray-400 text-sm mb-6 leading-relaxed px-4">
-                            Mide tus habilidades con preguntas técnicas en vivo.
-                            Responde usando tu micrófono y obtén retroalimentación inmediata.
-                        </p>
-                        {isInterviewMode ? (
-                            <button
-                                onClick={stopInterview}
-                                className="w-full py-4 rounded-2xl font-bold transition-all shadow-[0_0_20px_rgba(239,68,68,0.4)] active:scale-95 flex items-center justify-center gap-2 cursor-pointer bg-red-500/10 border border-red-500 hover:bg-red-500 text-white"
-                            >
-                                <SquareSquare size={20} className="mb-0.5" />
-                                Finalizar Simulación
-                            </button>
+                        {isCvMode ? (
+                            <>
+                                <h3 className="text-white text-lg font-bold mb-2">Creador de CV con IA</h3>
+                                <p className="text-gray-400 text-sm mb-4 leading-relaxed px-4">
+                                    Responde las preguntas del asistente paso a paso para generar tu CV profesional con diseño Harvard.
+                                </p>
+                                <div className="py-3 px-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-300 text-sm font-semibold">
+                                    Sesión de creación en curso →
+                                </div>
+                            </>
                         ) : (
-                            <button
-                                onClick={startInterview}
-                                className="w-full py-4 rounded-2xl font-bold transition-all shadow-[0_0_20px_rgba(37,99,235,0.4)] active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
-                                style={{ background: 'linear-gradient(to right, #2563EB, #22D3EE)', color: '#fff' }}
-                            >
-                                <PlayCircle size={20} className="mb-0.5" />
-                                Iniciar Simulación de Entrevista
-                            </button>
+                            <>
+                                <h3 className="text-white text-lg font-bold mb-2">Simulador de Entrevistas</h3>
+                                <p className="text-gray-400 text-sm mb-6 leading-relaxed px-4">
+                                    Mide tus habilidades con preguntas técnicas en vivo.
+                                    Responde usando tu micrófono y obtén retroalimentación inmediata.
+                                </p>
+                                {isInterviewMode ? (
+                                    <button
+                                        onClick={stopInterview}
+                                        className="w-full py-4 rounded-2xl font-bold transition-all shadow-[0_0_20px_rgba(239,68,68,0.4)] active:scale-95 flex items-center justify-center gap-2 cursor-pointer bg-red-500/10 border border-red-500 hover:bg-red-500 text-white"
+                                    >
+                                        <SquareSquare size={20} className="mb-0.5" />
+                                        Finalizar Simulación
+                                    </button>
+                                ) : (
+                                    <button
+                                        onClick={startInterview}
+                                        className="w-full py-4 rounded-2xl font-bold transition-all shadow-[0_0_20px_rgba(37,99,235,0.4)] active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                                        style={{ background: 'linear-gradient(to right, #2563EB, #22D3EE)', color: '#fff' }}
+                                    >
+                                        <PlayCircle size={20} className="mb-0.5" />
+                                        Iniciar Simulación de Entrevista
+                                    </button>
+                                )}
+                            </>
                         )}
                     </div>
                 </div>
@@ -663,6 +745,52 @@ const ChatCoach = () => {
             </div>
 
         </div >
+
+        {/* ── MODAL DE GENERACIÓN DE CV ─────────────────────────────────────── */}
+        {cvModal && (
+            <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 sm:p-6 animate-fade-in">
+                <div className="bg-white rounded-2xl sm:rounded-3xl p-6 sm:p-8 max-w-sm w-full text-center shadow-2xl">
+                    {cvModal.status === 'generating' ? (
+                        <>
+                            <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-4 rounded-full bg-blue-50 flex items-center justify-center">
+                                <Loader2 size={28} className="text-[#2563EB] animate-spin" />
+                            </div>
+                            <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-2">Generando tu CV...</h3>
+                            <p className="text-sm text-gray-500">Creando tu archivo Word con diseño Harvard profesional.</p>
+                        </>
+                    ) : cvModal.status === 'ready' ? (
+                        <>
+                            <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-4 rounded-full bg-green-50 flex items-center justify-center">
+                                <CheckCircle size={28} className="text-green-500" />
+                            </div>
+                            <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-2">¡CV generado con éxito!</h3>
+                            <p className="text-sm text-gray-500 mb-5">Tu archivo .docx se ha descargado automáticamente.</p>
+                            <button
+                                onClick={() => setCvModal(null)}
+                                className="px-6 py-2.5 bg-[#2563EB] text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition cursor-pointer"
+                            >
+                                Continuar
+                            </button>
+                        </>
+                    ) : (
+                        <>
+                            <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-4 rounded-full bg-red-50 flex items-center justify-center">
+                                <AlertCircle size={28} className="text-red-500" />
+                            </div>
+                            <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-2">Error al generar el archivo Word</h3>
+                            <p className="text-sm text-gray-500 mb-5">Ocurrió un error. Intenta de nuevo más tarde.</p>
+                            <button
+                                onClick={() => setCvModal(null)}
+                                className="px-6 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-semibold text-sm hover:bg-gray-200 transition cursor-pointer"
+                            >
+                                Cerrar
+                            </button>
+                        </>
+                    )}
+                </div>
+            </div>
+        )}
+        </>
     );
 };
 

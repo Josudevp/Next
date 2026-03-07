@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   CheckCircle, ChevronRight, ChevronLeft, Sparkles,
@@ -61,6 +61,13 @@ const GOALS = [
   { id: 'coach', label: 'Tener un mentor / coach', badge: '🧑‍🏫' },
   { id: 'practice', label: 'Prepararme para entrevistas', badge: '🎤' },
 ]
+
+const hasCompletedOnboarding = (profile) => {
+  const skillsCount = Array.isArray(profile?.skills) ? profile.skills.length : 0
+  const goalsCount = Array.isArray(profile?.goals) ? profile.goals.length : 0
+
+  return Boolean(profile?.area && profile?.jobType && skillsCount > 0 && goalsCount > 0)
+}
 
 // ─── Barra de progreso (azul = next-primary) ──────────────────────────────────
 const TopBar = ({ step, total }) => (
@@ -327,6 +334,41 @@ const Onboarding = () => {
   const [goals, setGoals] = useState([])
   const [isSaving, setIsSaving] = useState(false)
 
+  useEffect(() => {
+    const checkExistingOnboarding = async () => {
+      const token = localStorage.getItem('next_token')
+      const session = localStorage.getItem('next_session')
+
+      if (!token || !session) {
+        navigate('/login', { replace: true })
+        return
+      }
+
+      if (localStorage.getItem('next_onboarding_completed') === 'true') {
+        navigate('/dashboard', { replace: true })
+        return
+      }
+
+      try {
+        const { data } = await axiosInstance.get('/user/profile')
+        if (hasCompletedOnboarding(data)) {
+          localStorage.setItem('next_onboarding_completed', 'true')
+          localStorage.setItem('next_profile', JSON.stringify({
+            area: data.area,
+            jobType: data.jobType,
+            skills: data.skills,
+            goals: data.goals,
+          }))
+          navigate('/dashboard', { replace: true })
+        }
+      } catch (error) {
+        console.error('[Onboarding] Error validando estado inicial:', error)
+      }
+    }
+
+    checkExistingOnboarding()
+  }, [navigate])
+
   const toggleSkill = (skill) =>
     setSkills(prev => prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill])
 
@@ -368,9 +410,15 @@ const Onboarding = () => {
 
         // Guardar respaldo local
         localStorage.setItem('next_profile', JSON.stringify({ ...payload }))
+        localStorage.setItem('next_onboarding_completed', 'true')
+        localStorage.setItem('next_user', JSON.stringify({
+          ...(JSON.parse(localStorage.getItem('next_user') || '{}')),
+          name: user?.name,
+          email: user?.email,
+        }))
 
         // Redirigir al inicio formal (dashboard hidratado)
-        navigate('/dashboard')
+        navigate('/dashboard', { replace: true })
       }
     } catch (error) {
       console.error('Error al guardar datos de onboarding:', error)

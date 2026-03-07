@@ -8,6 +8,13 @@ import {
 import LogoNext from '../components/LogoNext'
 import axiosInstance from '../api/axiosInstance'
 
+const hasCompletedOnboarding = (profile) => {
+  const skillsCount = Array.isArray(profile?.skills) ? profile.skills.length : 0
+  const goalsCount = Array.isArray(profile?.goals) ? profile.goals.length : 0
+
+  return Boolean(profile?.area && profile?.jobType && skillsCount > 0 && goalsCount > 0)
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // (El Score ahora se consume enteramente desde MySQL backend)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -127,6 +134,8 @@ const Dashboard = () => {
       const session = localStorage.getItem('next_session')
       const token = localStorage.getItem('next_token')
       const storedUser = JSON.parse(localStorage.getItem('next_user') || 'null')
+      const cachedProfile = JSON.parse(localStorage.getItem('next_profile') || 'null')
+      const onboardingCompleted = localStorage.getItem('next_onboarding_completed') === 'true'
 
       if (!session || !token || !storedUser) {
         navigate('/login', { replace: true })
@@ -140,13 +149,47 @@ const Dashboard = () => {
         const response = await axiosInstance.get('/user/profile')
         const dbProfile = response.data
 
+        if (hasCompletedOnboarding(dbProfile)) {
+          localStorage.setItem('next_onboarding_completed', 'true')
+          localStorage.setItem('next_profile', JSON.stringify({
+            area: dbProfile.area,
+            jobType: dbProfile.jobType,
+            skills: dbProfile.skills,
+            goals: dbProfile.goals,
+          }))
+        } else {
+          localStorage.removeItem('next_onboarding_completed')
+          navigate('/onboarding', { replace: true })
+          return
+        }
+
         setProfile(dbProfile)
         setScore(dbProfile.score || 0)
 
       } catch (error) {
         console.error('Error fetching DB profile:', error)
-        // No usar fallback inseguro local, redirigir al onboarding siempre que el perfil no exista o falle
-        navigate('/onboarding', { replace: true })
+
+        if (!onboardingCompleted && !hasCompletedOnboarding(cachedProfile)) {
+          navigate('/onboarding', { replace: true })
+          return
+        }
+
+        if (cachedProfile) {
+          setProfile({
+            score: 0,
+            area: cachedProfile.area || '',
+            skills: Array.isArray(cachedProfile.skills) ? cachedProfile.skills : [],
+            goals: Array.isArray(cachedProfile.goals) ? cachedProfile.goals : [],
+            jobType: cachedProfile.jobType || '',
+            experienceLevel: 'Sin experiencia',
+            profilePicture: null,
+            hasCv: false,
+          })
+          setScore(0)
+          return
+        }
+
+        navigate('/profile', { replace: true })
       }
     }
 
@@ -315,7 +358,7 @@ const Dashboard = () => {
               <GrowthItem
                 label="Actualizar mis habilidades"
                 boost="+3%"
-                onClick={() => navigate('/onboarding')}
+                onClick={() => navigate('/profile')}
               />
               <GrowthItem
                 label="Explorar vacantes afines"
