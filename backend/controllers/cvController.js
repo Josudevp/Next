@@ -249,7 +249,19 @@ export const generateCvDocument = async (req, res) => {
             });
         }
 
-        if (!hasExperience && projects?.length > 0) {
+        if (experience?.length > 0) {
+            children.push(buildSectionTitle('Experiencia Laboral'));
+            experience.forEach((item) => {
+                children.push(...buildEntry({
+                    title: item.position || 'Cargo',
+                    subtitle: item.company || '',
+                    dates: item.dates || '',
+                    description: item.description || '',
+                }));
+            });
+        }
+
+        if (projects?.length > 0) {
             children.push(buildSectionTitle('Proyectos Destacados'));
             projects.forEach((project) => {
                 children.push(...buildEntry({
@@ -258,16 +270,6 @@ export const generateCvDocument = async (req, res) => {
                     dates: project.dates || '',
                     description: project.description || '',
                     accent: project.tech || '',
-                }));
-            });
-        } else if (hasExperience && experience?.length > 0) {
-            children.push(buildSectionTitle('Experiencia Laboral'));
-            experience.forEach((item) => {
-                children.push(...buildEntry({
-                    title: item.position || 'Cargo',
-                    subtitle: item.company || '',
-                    dates: item.dates || '',
-                    description: item.description || '',
                 }));
             });
         }
