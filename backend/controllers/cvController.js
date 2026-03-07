@@ -158,6 +158,23 @@ const buildEntry = ({ title, subtitle, dates, description, accent }) => {
     return paragraphs;
 };
 
+const normalizeSkillList = (value) => {
+    if (Array.isArray(value)) {
+        return value
+            .map((item) => String(item || '').trim())
+            .filter(Boolean);
+    }
+
+    if (typeof value === 'string') {
+        return value
+            .split(/,|\n|·|\||;/)
+            .map((item) => item.trim())
+            .filter(Boolean);
+    }
+
+    return [];
+};
+
 export const generateCvDocument = async (req, res) => {
     try {
         const cvData = req.body;
@@ -165,7 +182,7 @@ export const generateCvDocument = async (req, res) => {
             return res.status(400).json({ error: 'Datos de CV inválidos o incompletos.' });
         }
 
-        const { personalInfo, includePhoto, summary, education, experience, projects, skills, hasExperience } = cvData;
+        const { personalInfo, includePhoto, summary, education, experience, skills } = cvData;
         const userId = req.user?.userId || req.user?.id;
 
         let imageParagraph = null;
@@ -253,7 +270,7 @@ export const generateCvDocument = async (req, res) => {
             children.push(buildSectionTitle('Experiencia Laboral'));
             experience.forEach((item) => {
                 children.push(...buildEntry({
-                    title: item.position || 'Cargo',
+                    title: `${item.position || 'Cargo'}${item.projectLabel ? ' (Proyecto)' : ''}`,
                     subtitle: item.company || '',
                     dates: item.dates || '',
                     description: item.description || '',
@@ -261,28 +278,19 @@ export const generateCvDocument = async (req, res) => {
             });
         }
 
-        if (projects?.length > 0) {
-            children.push(buildSectionTitle('Proyectos Destacados'));
-            projects.forEach((project) => {
-                children.push(...buildEntry({
-                    title: project.name || 'Proyecto',
-                    subtitle: '',
-                    dates: project.dates || '',
-                    description: project.description || '',
-                    accent: project.tech || '',
-                }));
-            });
-        }
+        const technicalSkills = normalizeSkillList(skills?.technical);
+        const softSkills = normalizeSkillList(skills?.soft);
+        const allSkills = normalizeSkillList(skills?.all);
 
         const skillLines = [];
-        if (skills?.technical?.length > 0) {
-            skillLines.push(`Técnicas: ${skills.technical.join(', ')}`);
+        if (technicalSkills.length > 0) {
+            skillLines.push(`Técnicas: ${technicalSkills.join(', ')}`);
         }
-        if (skills?.soft?.length > 0) {
-            skillLines.push(`Blandas: ${skills.soft.join(', ')}`);
+        if (softSkills.length > 0) {
+            skillLines.push(`Blandas: ${softSkills.join(', ')}`);
         }
-        if (skills?.all?.length > 0) {
-            skillLines.push(skills.all.join(' · '));
+        if (allSkills.length > 0) {
+            skillLines.push(allSkills.join(' · '));
         }
 
         if (skillLines.length > 0) {
