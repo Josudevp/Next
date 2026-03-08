@@ -22,6 +22,10 @@ services:
         value: https://next-frontend-i0yt.onrender.com
       - key: PASSWORD_RESET_FRONTEND_URL
         value: https://next-frontend-i0yt.onrender.com
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
 
   # 2. LA CARA (FRONTEND)
   - type: web

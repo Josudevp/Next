@@ -31,11 +31,17 @@ const ForgotPassword = () => {
 
     setIsLoading(true)
     try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 20000)
+
       const response = await fetch(`${API_URL}/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: cleanEmail }),
+        signal: controller.signal,
       })
+
+      clearTimeout(timeoutId)
       const data = await response.json()
       if (!response.ok) {
         setError(data.mensaje || 'No se pudo enviar el correo.')
@@ -44,7 +50,11 @@ const ForgotPassword = () => {
       setSuccess(data.mensaje || 'Revisa tu correo para continuar.')
     } catch (requestError) {
       console.error('Error en forgot password:', requestError)
-      setError('Error de conexión con el servidor.')
+      if (requestError.name === 'AbortError') {
+        setError('La solicitud tardó demasiado. Intenta nuevamente en unos segundos.')
+      } else {
+        setError('Error de conexión con el servidor.')
+      }
     } finally {
       setIsLoading(false)
     }

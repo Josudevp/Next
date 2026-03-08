@@ -11,7 +11,18 @@ const createMailTransporter = () => nodemailer.createTransport({
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
   },
+  // Evita requests colgados cuando SMTP tarda demasiado en producción.
+  connectionTimeout: 12000,
+  greetingTimeout: 12000,
+  socketTimeout: 15000,
 });
+
+const withTimeout = (promise, ms, message) => {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
+  ]);
+};
 
 const normalizeUrl = (value) => {
   if (!value) return null;
@@ -156,9 +167,14 @@ export const forgotPassword = async (req, res) => {
 
     const frontendUrl = resolveFrontendUrl(req);
     const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+
+    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+      return res.status(500).json({ mensaje: 'El servicio de correo no está configurado.' });
+    }
+
     const transporter = createMailTransporter();
 
-    await transporter.sendMail({
+    await withTimeout(transporter.sendMail({
       from: `NEXT <${process.env.EMAIL_USER}>`,
       to: user.email,
       subject: 'Recuperación de contraseña - NEXT',
@@ -178,12 +194,12 @@ export const forgotPassword = async (req, res) => {
           <p>Este enlace expirará en 1 hora.</p>
         </div>
       `,
-    });
+    }), 15000, 'Timeout al enviar correo de recuperación');
 
     return res.json({ mensaje: 'Revisa tu correo para continuar con la recuperación.' });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ mensaje: 'No se pudo procesar la recuperación.' });
+    return res.status(500).json({ mensaje: 'No se pudo enviar el correo de recuperación. Intenta nuevamente.' });
   }
 };
 
