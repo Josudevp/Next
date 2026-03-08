@@ -8,6 +8,8 @@ import './App.css'
 const Home       = lazy(() => import('./pages/Home'))
 const Login      = lazy(() => import('./pages/Login'))
 const SigIn      = lazy(() => import('./pages/SigIn'))
+const ForgotPassword = lazy(() => import('./pages/ForgotPassword'))
+const ResetPassword = lazy(() => import('./pages/ResetPassword'))
 const Onboarding = lazy(() => import('./pages/Onboarding'))
 const Dashboard  = lazy(() => import('./pages/Dashboard'))
 const IACoach    = lazy(() => import('./pages/IACoach'))
@@ -91,6 +93,8 @@ function App() {
             <Route path="/" element={<Home />} />
             <Route path="/login" element={<Login />} />
             <Route path="/signin" element={<SigIn />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password/:token" element={<ResetPassword />} />
 
             {/* ── Rutas PRIVADAS — requieren next_token + next_session ── */}
             <Route path="/onboarding" element={

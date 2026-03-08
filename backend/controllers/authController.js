@@ -1,6 +1,55 @@
 import User from '../models/User.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+import nodemailer from 'nodemailer';
+import { Op } from 'sequelize';
+
+const createMailTransporter = () => nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS,
+  },
+});
+
+const normalizeUrl = (value) => {
+  if (!value) return null;
+  return value.endsWith('/') ? value.slice(0, -1) : value;
+};
+
+const isLocalUrl = (value) => {
+  if (!value) return false;
+  return value.includes('localhost') || value.includes('127.0.0.1');
+};
+
+const resolveFrontendUrl = (req) => {
+  const resetFrontendUrl = normalizeUrl(process.env.PASSWORD_RESET_FRONTEND_URL);
+  const envUrl = normalizeUrl(process.env.FRONTEND_URL);
+  const requestOrigin = normalizeUrl(req.get('origin'));
+
+  // 1) URL dedicada para recuperación (prioridad máxima)
+  if (resetFrontendUrl && !isLocalUrl(resetFrontendUrl)) {
+    return resetFrontendUrl;
+  }
+
+  // 2) Origen de la petición, si viene de frontend público
+  if (requestOrigin && !isLocalUrl(requestOrigin)) {
+    return requestOrigin;
+  }
+
+  // 3) FRONTEND_URL del entorno
+  if (envUrl && !isLocalUrl(envUrl)) {
+    return envUrl;
+  }
+
+  // 4) En producción nunca devolver localhost
+  if (process.env.NODE_ENV === 'production') {
+    return 'https://next-frontend-i0yt.onrender.com';
+  }
+
+  return envUrl || requestOrigin || 'http://localhost:5173';
+};
 
 // ----------------------------------------------------
 // FUNCION 1: REGISTRAR UN NUEVO USUARIO
@@ -48,7 +97,7 @@ export const register = async (req, res) => {
 // ----------------------------------------------------
 export const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, rememberMe } = req.body;
 
     // 1. Buscar al usuario
     const user = await User.findOne({ where: { email } });
@@ -64,7 +113,9 @@ export const login = async (req, res) => {
 
     // 3. Generar nuevo Token
     const payload = { userId: user.id };
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '8h' });
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: rememberMe ? '30d' : '1d'
+    });
 
     res.json({ 
       mensaje: 'Login exitoso', 
@@ -75,5 +126,101 @@ export const login = async (req, res) => {
   } catch (error) {
     console.error(error);
     res.status(500).json({ mensaje: 'Error en el servidor' });
+  }
+};
+
+// ----------------------------------------------------
+// FUNCION 3: SOLICITAR RECUPERACIÓN DE CONTRASEÑA
+// ----------------------------------------------------
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const cleanEmail = String(email || '').trim().toLowerCase();
+
+    if (!cleanEmail) {
+      return res.status(400).json({ mensaje: 'El correo es obligatorio' });
+    }
+
+    const user = await User.findOne({ where: { email: cleanEmail } });
+
+    if (!user) {
+      return res.status(404).json({ mensaje: 'No existe una cuenta asociada a ese correo.' });
+    }
+
+    const resetToken = crypto.randomBytes(20).toString('hex');
+    const resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000);
+
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpires = resetPasswordExpires;
+    await user.save();
+
+    const frontendUrl = resolveFrontendUrl(req);
+    const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+    const transporter = createMailTransporter();
+
+    await transporter.sendMail({
+      from: `NEXT <${process.env.EMAIL_USER}>`,
+      to: user.email,
+      subject: 'Recuperación de contraseña - NEXT',
+      html: `
+        <div style="font-family: Arial, sans-serif; color: #111827; line-height: 1.6;">
+          <h2 style="margin-bottom: 8px;">Recupera tu contraseña</h2>
+          <p>Recibimos una solicitud para restablecer la contraseña de tu cuenta en NEXT.</p>
+          <p>
+            Haz clic en el siguiente enlace para crear una nueva contraseña:
+          </p>
+          <p style="margin: 24px 0;">
+            <a href="${resetUrl}" style="background: #2563EB; color: #FFFFFF; padding: 12px 20px; border-radius: 10px; text-decoration: none; display: inline-block; font-weight: 700;">
+              Restablecer contraseña
+            </a>
+          </p>
+          <p>Si no solicitaste este cambio, puedes ignorar este correo.</p>
+          <p>Este enlace expirará en 1 hora.</p>
+        </div>
+      `,
+    });
+
+    return res.json({ mensaje: 'Revisa tu correo para continuar con la recuperación.' });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ mensaje: 'No se pudo procesar la recuperación.' });
+  }
+};
+
+// ----------------------------------------------------
+// FUNCION 4: RESTABLECER CONTRASEÑA
+// ----------------------------------------------------
+export const resetPassword = async (req, res) => {
+  try {
+    const { token } = req.params;
+    const { password } = req.body;
+
+    if (!password) {
+      return res.status(400).json({ mensaje: 'La nueva contraseña es obligatoria' });
+    }
+
+    const user = await User.findOne({
+      where: {
+        resetPasswordToken: token,
+        resetPasswordExpires: {
+          [Op.gt]: new Date(),
+        },
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({ mensaje: 'El enlace es inválido o ya expiró.' });
+    }
+
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(password, salt);
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+    await user.save();
+
+    return res.json({ mensaje: 'Contraseña actualizada correctamente.' });
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ mensaje: 'No se pudo restablecer la contraseña.' });
   }
 };

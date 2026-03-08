@@ -16,14 +16,17 @@ const sanitize = (value) => value.trim()
 const Login = () => {
     const navigate = useNavigate()
 
-    const [formData, setFormData] = useState({ email: '', password: '' })
+    const [formData, setFormData] = useState({ email: '', password: '', rememberMe: false })
     const [errores, setErrores] = useState({})
     const [isLoading, setIsLoading] = useState(false)
 
     // Actualiza el campo y limpia su error en tiempo real
     const handleChange = (e) => {
-        const { name, value } = e.target
-        setFormData(prev => ({ ...prev, [name]: value }))
+        const { name, value, type, checked } = e.target
+        setFormData(prev => ({
+            ...prev,
+            [name]: type === 'checkbox' ? checked : value,
+        }))
         if (errores[name]) {
             setErrores(prev => ({ ...prev, [name]: null }))
         }
@@ -53,13 +56,14 @@ const Login = () => {
         try {
             const email = sanitize(formData.email)
             const password = formData.password
+            const rememberMe = formData.rememberMe
 
             const response = await fetch(`${API_URL}/auth/login`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ email, password })
+                body: JSON.stringify({ email, password, rememberMe })
             })
 
             const data = await response.json()
@@ -175,16 +179,19 @@ const Login = () => {
                                 <input
                                     type="checkbox"
                                     id="remember"
+                                    name="rememberMe"
+                                    checked={formData.rememberMe}
+                                    onChange={handleChange}
                                     className="w-4 h-4 accent-[#2563EB] cursor-pointer"
                                 />
                                 <span className="text-gray-500 text-sm select-none">Recordarme</span>
                             </label>
-                            <button
-                                type="button"
+                            <Link
+                                to="/forgot-password"
                                 className="text-[#2563EB] text-sm font-medium hover:underline cursor-pointer"
                             >
                                 ¿Olvidaste tu contraseña?
-                            </button>
+                            </Link>
                         </div>
 
                         <Button

@@ -48,6 +48,14 @@ const User = sequelize.define('User', {
   cvText: {
     type: DataTypes.TEXT('long'),
     allowNull: true
+  },
+  resetPasswordToken: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  resetPasswordExpires: {
+    type: DataTypes.DATE,
+    allowNull: true
   }
 });
 
