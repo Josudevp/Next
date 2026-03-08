@@ -312,7 +312,7 @@ const ProfilePage = () => {
                         Dashboard
                     </button>
                     <div className="hidden sm:block">
-                        <LogoNext />
+                        <LogoNext to="/dashboard" />
                     </div>
                 </div>
                 <span className="text-sm font-semibold text-gray-700">Mi Perfil</span>

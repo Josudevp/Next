@@ -86,7 +86,7 @@ const Login = () => {
     }
 
     return (
-        <div className="flex flex-col-reverse sm:flex-row min-h-screen sm:h-screen w-full relative overflow-y-auto sm:overflow-hidden">
+        <div className="relative flex min-h-[100dvh] w-full flex-col-reverse overflow-y-auto sm:flex-row sm:overflow-hidden">
 
             {/* ── Logo mobile ─────────────────────────────────── */}
             <div className="sm:hidden absolute top-6 left-6 z-10">
@@ -101,7 +101,7 @@ const Login = () => {
                 className="
                     bg-white flex-1 sm:flex-none
                     sm:w-[45%] lg:w-[42%] xl:w-[38%]
-                    min-h-screen sm:h-screen flex sm:items-center sm:justify-center
+                    min-h-[100dvh] flex sm:items-center sm:justify-center
                     sm:bg-[#31445E] sm:bg-[radial-gradient(circle,#69809E_0%,#31445E_100%)]
                     sm:shadow-[5px_0_30px_rgba(0,0,0,0.25)]
                     pt-20 pb-10 px-5 sm:py-8 relative
@@ -208,7 +208,7 @@ const Login = () => {
             ══════════════════════════════════════════════════════ */}
             <section
                 aria-label="Sección informativa"
-                className="hidden sm:flex flex-1 flex-col h-screen text-center px-8 py-8"
+                className="hidden sm:flex flex-1 flex-col min-h-[100dvh] text-center px-8 py-8"
             >
                 <div className="mb-auto">
                     <LogoNext />

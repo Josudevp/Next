@@ -13,6 +13,7 @@ const Dashboard  = lazy(() => import('./pages/Dashboard'))
 const IACoach    = lazy(() => import('./pages/IACoach'))
 const JobHunter  = lazy(() => import('./pages/JobHunter'))
 const ProfilePage = lazy(() => import('./pages/ProfilePage'))
+const CVMaker     = lazy(() => import('./pages/CVMaker'))
 
 // ── Guardia de rutas ──────────────────────────────────────────────────────────
 import ProtectedRoute from './components/ProtectedRoute'
@@ -109,6 +110,9 @@ function App() {
             } />
             <Route path="/profile" element={
               <ProtectedRoute><ProfilePage /></ProtectedRoute>
+            } />
+            <Route path="/cvmaker" element={
+              <ProtectedRoute><CVMaker /></ProtectedRoute>
             } />
 
           </Routes>

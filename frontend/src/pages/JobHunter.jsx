@@ -300,7 +300,7 @@ const JobHunter = () => {
             <span className="text-sm font-semibold text-gray-800">Job Hunter</span>
           </div>
           <div className="ml-auto">
-            <LogoNext />
+            <LogoNext to="/dashboard" />
           </div>
         </div>
       </nav>

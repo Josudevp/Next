@@ -136,7 +136,7 @@ const SigIn = () => {
     }
 
     return (
-        <div className="flex flex-col sm:flex-row min-h-screen sm:h-screen w-full relative sm:overflow-hidden">
+        <div className="relative flex min-h-dvh w-full flex-col sm:flex-row sm:overflow-hidden">
 
             {/* ── Logo mobile ─────────────────────────────────── */}
             <div className="sm:hidden absolute top-6 left-6 z-10">
@@ -148,7 +148,7 @@ const SigIn = () => {
             ══════════════════════════════════════════════════════ */}
             <section
                 aria-label="Sección informativa"
-                className="hidden sm:flex flex-1 flex-col h-screen text-center px-8 py-8"
+                className="hidden sm:flex flex-1 flex-col min-h-dvh text-center px-8 py-8"
             >
                 <div className="mb-auto">
                     <LogoNext />
@@ -178,7 +178,7 @@ const SigIn = () => {
                     flex justify-center items-start sm:items-center px-6 sm:px-10
                     bg-white flex-1
                     sm:flex-none sm:w-[45%] lg:w-[42%] xl:w-[38%]
-                    min-h-screen sm:h-screen
+                    min-h-dvh
                     sm:bg-[radial-gradient(circle,#69809E_0%,#31445E_100%)]
                     sm:shadow-[-5px_0_30px_rgba(0,0,0,0.25)]
                     pt-20 pb-10 sm:py-0 relative
@@ -215,7 +215,7 @@ const SigIn = () => {
                                 role="alert"
                                 className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-3.5 py-3 mb-3 text-left animate-fade-in"
                             >
-                                <AlertCircle size={15} className="text-red-400 flex-shrink-0 mt-0.5" />
+                                <AlertCircle size={15} className="text-red-400 shrink-0 mt-0.5" />
                                 <p className="text-red-600 text-sm">{errores.global}</p>
                             </div>
                         )}

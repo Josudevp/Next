@@ -2,7 +2,7 @@ import ChatCoach from '../components/ChatCoach'
 
 const IACoach = () => {
   return (
-    <div className="h-screen w-screen overflow-hidden bg-[#F8FAFC]">
+    <div className="min-h-[100dvh] w-full overflow-hidden bg-[#F8FAFC]">
       <ChatCoach />
     </div>
   )

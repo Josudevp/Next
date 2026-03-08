@@ -12,6 +12,8 @@ const ChatCoach = () => {
 
     // Detectar modo creación de CV desde query param ?mode=createcv
     const isCvMode = new URLSearchParams(location.search).get('mode') === 'createcv';
+    // Plantilla seleccionada en CV Maker Hub — se propaga al backend en cada llamada
+    const templateId = new URLSearchParams(location.search).get('templateId') || 'francisco';
 
     // Job HuNTER: si venimos con datos de un empleo, prepara el prompt automático
     const pendingJobPrepRef = useRef(location.state?.jobPrep || null);
@@ -81,7 +83,7 @@ const ChatCoach = () => {
         const fetchInitGreeting = async () => {
             try {
                 setIsTyping(true);
-                const modeParam = isCvMode ? '?mode=createcv' : '';
+                const modeParam = isCvMode ? `?mode=createcv&templateId=${encodeURIComponent(templateId)}` : '';
                 const { data } = await axiosInstance.get(`/coach/init${modeParam}`);
                 if (cancelled) return; // StrictMode cleanup: ignorar respuesta de la invocación obsoleta
                 const greetingText = data.reply || (isCvMode
@@ -240,7 +242,7 @@ const ChatCoach = () => {
         const utterance = new SpeechSynthesisUtterance(cleanText);
         utterance.lang = 'es-ES';
         utterance.rate = 0.95;
-        utterance.pitch = 0.85; // Tono bajo → percepción masculina
+        utterance.pitch = 0.80; // Tono bajo → percepción masculina
 
         // Nombres comunes para voces masculinas en español (Chrome, Linux, Safari, Windows)
         const MALE_VOICE_NAMES = [
@@ -298,7 +300,9 @@ const ChatCoach = () => {
     // 6.5  Genera y descarga el archivo Word del CV llamando al backend
     const generateAndDownloadCv = async (cvData) => {
         try {
-            const response = await axiosInstance.post('/cv/generate', cvData, {
+            // Preserve templateId from URL if the AI didn't inject it in the JSON
+            const payload = { ...cvData, templateId: cvData.templateId || templateId };
+            const response = await axiosInstance.post('/cv/generate', payload, {
                 responseType: 'blob',
             });
             const blob = new Blob([response.data], {
@@ -307,7 +311,7 @@ const ChatCoach = () => {
             const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.href = url;
-            link.download = `CV_${(cvData.personalInfo?.name || 'MiCV').replace(/\s+/g, '_')}.docx`;
+            link.download = `CV_${(payload.personalInfo?.name || 'MiCV').replace(/\s+/g, '_')}.docx`;
             document.body.appendChild(link);
             link.click();
             document.body.removeChild(link);
@@ -338,6 +342,7 @@ const ChatCoach = () => {
                 history: messages.filter(m => m.id !== 'init' && !m.isError),
                 isInterviewMode,
                 isCvMode,
+                templateId,
             };
 
             // El interceptor adjunta el token y gestiona el error 401 automáticamente
@@ -470,7 +475,7 @@ const ChatCoach = () => {
 
     return (
         <>
-        <div className="flex w-full h-[100dvh] bg-white font-sans overflow-hidden fixed inset-0">
+        <div className="relative flex min-h-dvh w-full bg-white font-sans overflow-hidden lg:h-dvh">
 
             {/* ── COLUMNA IZQUIERDA (60%): CHAT & INPUT ── */}
             <div className="w-full lg:w-[60%] flex flex-col h-full border-r border-gray-100 shadow-[2px_0_15px_rgba(0,0,0,0.02)] relative z-10 bg-white">
@@ -514,7 +519,7 @@ const ChatCoach = () => {
                     </div>
 
                     <div className="ml-auto lg:ml-0">
-                        <LogoNext />
+                        <LogoNext to="/dashboard" />
                     </div>
                 </div>
 
@@ -522,7 +527,7 @@ const ChatCoach = () => {
                 {!isInterviewMode ? (
                     <>
                         {/* Área de mensajes con scroll encapsulado */}
-                        <div className="flex-1 overflow-y-auto px-6 py-6 bg-slate-50 flex flex-col gap-5">
+                        <div className="flex flex-1 flex-col gap-5 overflow-y-auto bg-slate-50 px-4 py-5 sm:px-6 sm:py-6">
                             {messages.map((msg) => {
                                 const isUser = msg.sender === 'user';
                                 return (

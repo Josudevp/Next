@@ -16,6 +16,14 @@
 body {
   font-family: 'Inter', sans-serif;
   -webkit-font-smoothing: antialiased;
+  min-height: 100dvh;
+  overflow-x: hidden;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
 }
 
 /* ── Scrollbar thin — coherente con Design System ──────────────────────────── */

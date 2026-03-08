@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom'
 import API_URL from '../api/api'
 import {
   Bell, ChevronRight, Lightbulb, Bot,
-  Briefcase, TrendingUp, LogOut, User as UserIcon, HelpCircle
+  Briefcase, TrendingUp, LogOut, User as UserIcon, HelpCircle, FileText
 } from 'lucide-react'
 import LogoNext from '../components/LogoNext'
 import axiosInstance from '../api/axiosInstance'
@@ -346,25 +346,27 @@ const Dashboard = () => {
             </div>
           </div>
 
-          {/* Tarjeta: Crece tu empleabilidad */}
-          <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)] animate-fade-in-up">
-            <h2 className="font-bold text-gray-900 mb-4">Crece tu empleabilidad</h2>
-            <div className="flex flex-col gap-2.5">
-              <GrowthItem
-                label="Practicar con IA Coach"
-                boost="+5%"
-                onClick={() => navigate('/ia-coach')}
-              />
-              <GrowthItem
-                label="Actualizar mis habilidades"
-                boost="+3%"
-                onClick={() => navigate('/profile')}
-              />
-              <GrowthItem
-                label="Explorar vacantes afines"
-                boost="+2%"
-                onClick={() => navigate('/job-hunter')}
-              />
+          {/* Tarjeta: CV Maker */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)] flex items-center justify-between gap-4 animate-fade-in-up">
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1.5">
+                <FileText size={18} className="text-[#10B981]" />
+                <h2 className="font-bold text-gray-900">CV Maker</h2>
+              </div>
+              <p className="text-sm text-gray-500 mb-4 leading-relaxed">
+                Genera tu CV profesional con la ayuda de la IA de NEXT.
+              </p>
+              <Link
+                to="/coach?mode=createcv&templateId=francisco"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 hover:scale-[1.02] active:scale-[0.98]"
+                style={{ background: 'linear-gradient(to right, #059669, #10B981)' }}
+              >
+                Crear CV <ChevronRight size={14} />
+              </Link>
+            </div>
+
+            <div className="hidden sm:flex w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 items-center justify-center flex-shrink-0">
+              <FileText size={38} className="text-[#10B981] opacity-80" />
             </div>
           </div>
         </div>
