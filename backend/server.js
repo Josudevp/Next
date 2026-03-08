@@ -28,6 +28,9 @@ const allowedOrigins = [
   normalizeFrontendUrl(process.env.FRONTEND_URL),
   'http://localhost:5173',
   'http://localhost:4173',
+  'https://next-col.online',
+  'https://www.next-col.online',
+  'https://next-backend-i6el.onrender.com',
 ].filter(Boolean);
 
 // Regex de seguridad: acepta cualquier subdominio de onrender.com en caso
@@ -45,6 +48,8 @@ app.use(
       return callback(new Error(`CORS bloqueado para el origen: ${origin}`));
     },
     credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
   })
 );
 

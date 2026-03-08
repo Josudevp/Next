@@ -19,9 +19,9 @@ services:
       - key: JWT_SECRET
         sync: false
       - key: FRONTEND_URL
-        value: https://next-frontend-i0yt.onrender.com
+        value: https://next-col.online
       - key: PASSWORD_RESET_FRONTEND_URL
-        value: https://next-frontend-i0yt.onrender.com
+        value: https://next-col.online
       - key: EMAIL_USER
         sync: false
       - key: EMAIL_PASS
