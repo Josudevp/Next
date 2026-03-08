@@ -475,10 +475,10 @@ const ChatCoach = () => {
 
     return (
         <>
-        <div className="relative flex min-h-dvh w-full bg-white font-sans overflow-hidden lg:h-dvh">
+        <div className="relative flex h-[100svh] min-h-[100svh] w-full overflow-hidden bg-white font-sans md:h-dvh md:min-h-dvh">
 
             {/* ── COLUMNA IZQUIERDA (60%): CHAT & INPUT ── */}
-            <div className="w-full lg:w-[60%] flex flex-col h-full border-r border-gray-100 shadow-[2px_0_15px_rgba(0,0,0,0.02)] relative z-10 bg-white">
+            <div className="relative z-10 flex h-full min-h-0 w-full flex-1 flex-col border-r border-gray-100 bg-white shadow-[2px_0_15px_rgba(0,0,0,0.02)] lg:w-[60%] lg:flex-none">
 
                 {/* Header (Nav interno) */}
                 <div className="h-16 flex items-center px-4 sm:px-6 border-b border-gray-100 flex-shrink-0 gap-2">
@@ -527,7 +527,7 @@ const ChatCoach = () => {
                 {!isInterviewMode ? (
                     <>
                         {/* Área de mensajes con scroll encapsulado */}
-                        <div className="flex flex-1 flex-col gap-5 overflow-y-auto bg-slate-50 px-4 py-5 sm:px-6 sm:py-6">
+                        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto bg-slate-50 px-4 py-5 sm:px-6 sm:py-6">
                             {messages.map((msg) => {
                                 const isUser = msg.sender === 'user';
                                 return (
@@ -580,7 +580,10 @@ const ChatCoach = () => {
                         </div>
 
                         {/* Área de Input Fija al fondo del 60% */}
-                        <div className="p-4 sm:p-6 bg-white border-t border-gray-100 flex-shrink-0">
+                        <div
+                            className="sticky bottom-0 mt-auto flex-shrink-0 border-t border-gray-100 bg-white p-4 sm:p-6"
+                            style={{ paddingBottom: 'calc(1rem + env(safe-area-inset-bottom, 0px))' }}
+                        >
                             <form onSubmit={sendMessage} className="flex gap-3 items-center">
                                 {/* Botón de Voz (Micrófono) */}
                                 <button
@@ -622,7 +625,7 @@ const ChatCoach = () => {
                         </div>
                     </>
                 ) : (
-                    <div className="flex-1 flex flex-col items-center justify-between bg-slate-50 px-4 sm:px-6 py-6 sm:py-8 overflow-y-auto">
+                    <div className="flex min-h-0 flex-1 flex-col items-center justify-between overflow-y-auto bg-slate-50 px-4 py-6 sm:px-6 sm:py-8">
                         {/* Centro: icono + estado */}
                         <div className="flex-1 flex flex-col items-center justify-center text-center gap-4 py-4">
                             <div className={`w-20 h-20 sm:w-24 sm:h-24 rounded-full flex items-center justify-center bg-white shadow-xl ${isListening ? 'shadow-red-500/30' : 'shadow-blue-500/20'}`}>
