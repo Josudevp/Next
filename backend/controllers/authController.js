@@ -2,26 +2,27 @@ import User from '../models/User.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
-import nodemailer from 'nodemailer';
 import { Op } from 'sequelize';
 
-const createMailTransporter = () => nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  // Evita requests colgados cuando SMTP tarda demasiado en producción.
-  connectionTimeout: 12000,
-  greetingTimeout: 12000,
-  socketTimeout: 15000,
-});
+const sendEmail = async ({ to, subject, html }) => {
+  const response = await fetch('https://api.brevo.com/v3/smtp/email', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'api-key': process.env.BREVO_API_KEY,
+    },
+    body: JSON.stringify({
+      sender: { name: 'NEXT', email: process.env.EMAIL_USER },
+      to: [{ email: to }],
+      subject,
+      htmlContent: html,
+    }),
+  });
 
-const withTimeout = (promise, ms, message) => {
-  return Promise.race([
-    promise,
-    new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
-  ]);
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Error al enviar correo: ${errorText}`);
+  }
 };
 
 const normalizeUrl = (value) => {
@@ -168,14 +169,11 @@ export const forgotPassword = async (req, res) => {
     const frontendUrl = resolveFrontendUrl(req);
     const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
 
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASS) {
+    if (!process.env.BREVO_API_KEY || !process.env.EMAIL_USER) {
       return res.status(500).json({ mensaje: 'El servicio de correo no está configurado.' });
     }
 
-    const transporter = createMailTransporter();
-
-    await withTimeout(transporter.sendMail({
-      from: `NEXT <${process.env.EMAIL_USER}>`,
+    await sendEmail({
       to: user.email,
       subject: 'Recuperación de contraseña - NEXT',
       html: `
@@ -194,7 +192,7 @@ export const forgotPassword = async (req, res) => {
           <p>Este enlace expirará en 1 hora.</p>
         </div>
       `,
-    }), 15000, 'Timeout al enviar correo de recuperación');
+    });
 
     return res.json({ mensaje: 'Revisa tu correo para continuar con la recuperación.' });
   } catch (error) {
