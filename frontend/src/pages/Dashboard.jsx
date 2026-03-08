@@ -127,72 +127,73 @@ const Dashboard = () => {
   const [profile, setProfile] = useState(null)
   const [score, setScore] = useState(0)
   const [animatedScore, setAnimatedScore] = useState(0)
+  const [loadError, setLoadError] = useState(false)
 
   // ── Auth guard + carga de datos remotos ──────────────────────────────────
-  useEffect(() => {
-    const checkAuthAndFetchProfile = async () => {
-      const session = localStorage.getItem('next_session')
-      const token = localStorage.getItem('next_token')
-      const storedUser = JSON.parse(localStorage.getItem('next_user') || 'null')
-      const cachedProfile = JSON.parse(localStorage.getItem('next_profile') || 'null')
-      const onboardingCompleted = localStorage.getItem('next_onboarding_completed') === 'true'
+  const loadProfile = async () => {
+    setLoadError(false)
+    const session = localStorage.getItem('next_session')
+    const token = localStorage.getItem('next_token')
+    const storedUser = JSON.parse(localStorage.getItem('next_user') || 'null')
+    const cachedProfile = JSON.parse(localStorage.getItem('next_profile') || 'null')
+    const onboardingCompleted = localStorage.getItem('next_onboarding_completed') === 'true'
 
-      if (!session || !token || !storedUser) {
-        navigate('/login', { replace: true })
+    if (!session || !token || !storedUser) {
+      navigate('/login', { replace: true })
+      return
+    }
+
+    setUser(storedUser)
+
+    try {
+      const response = await axiosInstance.get('/user/profile', { timeout: 15000 })
+      const dbProfile = response.data
+
+      if (hasCompletedOnboarding(dbProfile)) {
+        localStorage.setItem('next_onboarding_completed', 'true')
+        localStorage.setItem('next_profile', JSON.stringify({
+          area: dbProfile.area,
+          jobType: dbProfile.jobType,
+          skills: dbProfile.skills,
+          goals: dbProfile.goals,
+        }))
+      } else {
+        localStorage.removeItem('next_onboarding_completed')
+        localStorage.removeItem('next_profile')
+        navigate('/onboarding', { replace: true })
         return
       }
 
-      setUser(storedUser)
+      setProfile(dbProfile)
+      setScore(dbProfile.score || 0)
 
-      try {
-        // Obtenemos los datos directos desde MySQL centralizados
-        const response = await axiosInstance.get('/user/profile')
-        const dbProfile = response.data
+    } catch (error) {
+      console.error('Error fetching DB profile:', error)
 
-        if (hasCompletedOnboarding(dbProfile)) {
-          localStorage.setItem('next_onboarding_completed', 'true')
-          localStorage.setItem('next_profile', JSON.stringify({
-            area: dbProfile.area,
-            jobType: dbProfile.jobType,
-            skills: dbProfile.skills,
-            goals: dbProfile.goals,
-          }))
-        } else {
-          localStorage.removeItem('next_onboarding_completed')
-          navigate('/onboarding', { replace: true })
-          return
-        }
-
-        setProfile(dbProfile)
-        setScore(dbProfile.score || 0)
-
-      } catch (error) {
-        console.error('Error fetching DB profile:', error)
-
-        if (!onboardingCompleted && !hasCompletedOnboarding(cachedProfile)) {
-          navigate('/onboarding', { replace: true })
-          return
-        }
-
-        if (cachedProfile) {
-          setProfile({
-            score: 0,
-            area: cachedProfile.area || '',
-            skills: Array.isArray(cachedProfile.skills) ? cachedProfile.skills : [],
-            goals: Array.isArray(cachedProfile.goals) ? cachedProfile.goals : [],
-            jobType: cachedProfile.jobType || '',
-            experienceLevel: 'Sin experiencia',
-            profilePicture: null,
-            hasCv: false,
-          })
-          setScore(0)
-          return
-        }
-
-        navigate('/profile', { replace: true })
+      if (cachedProfile && onboardingCompleted) {
+        setProfile({
+          score: 0,
+          area: cachedProfile.area || '',
+          skills: Array.isArray(cachedProfile.skills) ? cachedProfile.skills : [],
+          goals: Array.isArray(cachedProfile.goals) ? cachedProfile.goals : [],
+          jobType: cachedProfile.jobType || '',
+          experienceLevel: 'Sin experiencia',
+          profilePicture: null,
+          hasCv: false,
+        })
+        setScore(0)
+        return
       }
-    }
 
+      // No hay caché: mostrar error con opción de reintentar
+      setLoadError(true)
+    }
+  }
+
+  useEffect(() => {
+    const checkAuthAndFetchProfile = async () => {
+      await loadProfile()
+    }
     checkAuthAndFetchProfile()
   }, [navigate])
 
@@ -235,6 +236,30 @@ const Dashboard = () => {
   }
 
   // Guard de render — espera datos
+  if (loadError) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-5">
+        <div className="text-center space-y-4">
+          <p className="text-gray-500 text-sm">No se pudo cargar tu perfil. El servidor puede estar iniciando.</p>
+          <button
+            onClick={loadProfile}
+            className="px-5 py-2.5 bg-[#2563EB] text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors cursor-pointer"
+          >
+            Reintentar
+          </button>
+          <div>
+            <button
+              onClick={() => { localStorage.clear(); navigate('/login', { replace: true }) }}
+              className="text-xs text-gray-400 underline cursor-pointer"
+            >
+              Volver al login
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   if (!user || !profile) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
