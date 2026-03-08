@@ -57,7 +57,7 @@ const resolveFrontendUrl = (req) => {
 
   // 4) En producción nunca devolver localhost
   if (process.env.NODE_ENV === 'production') {
-    return 'https://next-frontend-i0yt.onrender.com';
+    return 'https://next-col.online';
   }
 
   return envUrl || requestOrigin || 'http://localhost:5173';

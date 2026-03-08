@@ -19,43 +19,43 @@ const Home = () => {
     return (
         <main className='relative min-h-dvh overflow-hidden bg-linear-to-b from-[#EFEFEF] via-[#DCE5F3] to-[#8DA8D8] px-5 py-4 sm:px-6 md:h-dvh md:px-10 md:py-6 lg:px-16'>
             {/* Logo - Always Top Left */}
-            <nav className='relative z-10 mb-4 md:mb-0 md:absolute md:top-6 md:left-16'>
+            <nav className='absolute top-4 left-5 z-20 sm:left-6 md:top-6 md:left-16'>
                 <LogoNext />
             </nav>
 
             <div className='pointer-events-none absolute inset-x-0 bottom-0 h-[42vh] bg-linear-to-t from-[#5F7FB5]/80 via-[#AFC1E7]/35 to-transparent' />
 
             {/* Hero Section */}
-            <div className='relative z-10 mx-auto flex min-h-[calc(100dvh-4rem)] w-full max-w-7xl flex-1 flex-col justify-between gap-7 pt-2 pb-6 md:h-full md:min-h-0 md:flex-row md:items-center md:justify-center md:gap-12 md:pt-6 md:pb-6 lg:gap-16'>
+            <div className='relative z-10 mx-auto flex min-h-dvh w-full max-w-7xl flex-1 flex-col items-center justify-center gap-6 pt-16 pb-6 md:h-full md:min-h-0 md:flex-row md:items-center md:justify-center md:gap-12 md:pt-6 md:pb-6 lg:gap-16'>
                 
                 {/* Content Section */}
-                <section className='flex w-full flex-col gap-5 pt-6 md:w-1/2 md:gap-7 md:pt-0'>
+                <section className='flex w-full flex-col items-center gap-4 pt-0 md:w-1/2 md:items-start md:gap-5 md:pt-0'>
                     {/* Main Heading and Description */}
-                    <div className='flex flex-col gap-4 md:gap-5'>
-                        <h1 className='max-w-none text-[3.2rem] font-bold text-center leading-[0.96] text-pretty text-black sm:text-5xl md:max-w-none md:text-left lg:text-[4rem] xl:text-[4.5rem]'>
+                    <div className='flex w-full max-w-88 flex-col gap-3 md:max-w-none md:gap-4'>
+                        <h1 className='text-center text-[2.25rem] font-bold leading-[0.96] text-pretty text-black sm:text-[2.65rem] md:text-left md:text-[2.9rem] lg:text-[3.3rem] xl:text-[3.6rem]'>
                             Busca <span className='text-[#3B82F6]'>empleo</span> con la confianza de un <span className='text-[#3B82F6]'>experto</span>
                         </h1>
                         
-                        <p className='mx-auto max-w-88 text-base text-center text-slate-800 text-pretty leading-relaxed sm:max-w-xl sm:text-lg md:mx-0 md:text-left lg:text-[1.35rem]'>
+                        <p className='mx-auto max-w-80 text-[0.95rem] text-center text-slate-800 text-pretty leading-relaxed sm:max-w-xl sm:text-[1rem] md:mx-0 md:max-w-xl md:text-left lg:text-[1.12rem]'>
                             Next es el instructor IA que transforma tu perfil académico en una marca profesional imparable, guiándote hacia las vacantes donde tu talento brilla.
                         </p>
                     </div>
                 </section>
                 
                 {/* Interactive Section */}
-                <section className='flex w-full flex-col items-center justify-end gap-5 pb-4 md:w-1/2 md:justify-center md:gap-7 md:pb-0'>
+                <section className='flex w-full flex-col items-center justify-start gap-5 pt-2 pb-2 md:w-1/2 md:justify-center md:gap-7 md:pt-0 md:pb-0'>
                     {/* 3D Robot - Hidden on mobile */}
                     <div className='hidden w-full justify-center md:flex'>
                         <Robot3D />
                     </div>
                     
                     {/* Call to Action Buttons */}
-                    <div className='flex w-full max-w-lg flex-col items-center gap-4 pb-2 md:gap-5 md:pb-0'>
+                    <div className='flex w-full max-w-sm flex-col items-center gap-4 pb-0 md:max-w-lg md:gap-5 md:pb-0'>
                         <Button text={'Acelerar mi carrera'} accion={irAlSigin}/>
                         
                         <hr className='h-px w-28 border-none bg-slate-500/35' />
                         
-                        <div className='w-full max-w-60'>
+                        <div className='flex w-full justify-center md:w-auto'>
                             <SecundaryBtn text={'Iniciar sesion'} accion={irAlLogin}/>
                         </div>
                     </div>
