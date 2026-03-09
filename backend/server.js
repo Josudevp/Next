@@ -13,6 +13,7 @@ import coachRoutes from './routes/coachRoutes.js';
 import userRoutes from './routes/userRoutes.js';
 import jobRoutes from './routes/jobRoutes.js';
 import cvRoutes from './routes/cvRoutes.js';
+import exportRoutes from './routes/exportRoutes.js';
 
 const app = express();
 
@@ -53,14 +54,16 @@ app.use(
   })
 );
 
-app.use(express.json());
+// 10 MB limit to accommodate base64-encoded profile pictures in PDF export requests
+app.use(express.json({ limit: '10mb' }));
 
 // ── Rutas ────────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
 app.use('/api/coach', coachRoutes);
 app.use('/api/user', userRoutes);
-app.use('/api/jobs', jobRoutes); // Job HuNTER
-app.use('/api/cv', cvRoutes);    // CV Generator
+app.use('/api/jobs', jobRoutes);      // Job Hunter
+app.use('/api/cv', cvRoutes);         // CV Generator (save/load)
+app.use('/api/export', exportRoutes); // Server-side PDF export via Puppeteer
 
 // ── Health checks para Render ─────────────────────────────────────────────────
 // Render hace un GET periódico para verificar que el servicio está vivo.

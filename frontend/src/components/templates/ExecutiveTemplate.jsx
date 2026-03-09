@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { Download, Loader2, FileText } from 'lucide-react';
-import { openCvPrint, sortByDateDesc, normalizeReferenceGroups, formatReferenceLine } from '../../utils/pdfUtils';
+import { downloadCvPdf, sortByDateDesc, normalizeReferenceGroups, formatReferenceLine } from '../../utils/pdfUtils';
 
 const LETTER_PX_W = 816;
 const LETTER_PX_H = 1056;
@@ -74,14 +74,17 @@ const ExecutiveTemplate = ({ cvData = {}, profilePicture = null, onFirstExport }
         personalInfo.address,
     ].filter(Boolean).join('  ·  ');
 
-    // ── Native browser print ──────────────────────────────────────────────────
-    const handleDownloadPDF = () => {
-        if (!cvRef.current || !hasData) return;
+    const handleDownloadPDF = async () => {
+        if (!hasData) return;
         setIsDownloading(true);
-        openCvPrint(() => {
-            setIsDownloading(false);
+        try {
+            await downloadCvPdf(cvData, 'jordi', profilePicture, personalInfo?.name);
             onFirstExport?.();
-        });
+        } catch (err) {
+            console.error('[ExecutiveTemplate] PDF error:', err);
+        } finally {
+            setIsDownloading(false);
+        }
     };
 
     return (

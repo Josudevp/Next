@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { Download, Loader2, FileText, Phone, Mail, Linkedin, Github, Globe, MapPin } from 'lucide-react';
-import { openCvPrint, sortByDateDesc, normalizeReferenceGroups, formatReferenceLine } from '../../utils/pdfUtils';
+import { downloadCvPdf, sortByDateDesc, normalizeReferenceGroups, formatReferenceLine } from '../../utils/pdfUtils';
 
 // Letter (8.5 × 11 in) at 96 dpi ≈ 816 × 1056 px
 const LETTER_PX_W = 816;
@@ -66,14 +66,17 @@ const ModernBlueTemplate = ({ cvData = {}, profilePicture = null, onFirstExport 
         { icon: MapPin, value: personalInfo.address },
     ].filter(item => item.value);
 
-    // ── Native browser print ──
-    const handleDownloadPDF = () => {
-        if (!cvRef.current || !hasData) return;
+    const handleDownloadPDF = async () => {
+        if (!hasData) return;
         setIsDownloading(true);
-        openCvPrint(() => {
-            setIsDownloading(false);
+        try {
+            await downloadCvPdf(cvData, 'daniel', profilePicture, personalInfo?.name);
             onFirstExport?.();
-        });
+        } catch (err) {
+            console.error('[ModernBlueTemplate] PDF error:', err);
+        } finally {
+            setIsDownloading(false);
+        }
     };
 
     // ── Sidebar section heading ──

@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { Download, Loader2, FileText } from 'lucide-react';
-import { openCvPrint, sortByDateDesc, normalizeReferenceGroups, formatReferenceLine } from '../../utils/pdfUtils';
+import { downloadCvPdf, sortByDateDesc, normalizeReferenceGroups, formatReferenceLine } from '../../utils/pdfUtils';
 
 const LETTER_PX_W = 816;
 const LETTER_PX_H  = 1056;
@@ -79,14 +79,17 @@ const RightSidebarTemplate = ({ cvData = {}, profilePicture = null, onFirstExpor
         { label: personalInfo.address },
     ].filter(c => c.label);
 
-    // ── Native browser print ──────────────────────────────────────────────────
-    const handleDownloadPDF = () => {
-        if (!cvRef.current || !hasData) return;
+    const handleDownloadPDF = async () => {
+        if (!hasData) return;
         setIsDownloading(true);
-        openCvPrint(() => {
-            setIsDownloading(false);
+        try {
+            await downloadCvPdf(cvData, 'carlos', profilePicture, personalInfo?.name);
             onFirstExport?.();
-        });
+        } catch (err) {
+            console.error('[RightSidebarTemplate] PDF error:', err);
+        } finally {
+            setIsDownloading(false);
+        }
     };
 
     return (

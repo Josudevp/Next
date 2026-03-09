@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { Download, Loader2, FileText } from 'lucide-react';
-import { openCvPrint, sortByDateDesc, normalizeReferenceGroups, formatReferenceLine } from '../../utils/pdfUtils';
+import { downloadCvPdf, sortByDateDesc, normalizeReferenceGroups, formatReferenceLine } from '../../utils/pdfUtils';
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
@@ -112,13 +112,17 @@ const HarvardTemplate = ({ cvData = {}, profilePicture = null, onFirstExport }) 
         personalInfo.address,
     ].filter(Boolean).join('   ·   ');
 
-    const handleDownloadPDF = () => {
-        if (!cvRef.current || !hasData) return;
+    const handleDownloadPDF = async () => {
+        if (!hasData) return;
         setIsDownloading(true);
-        openCvPrint(() => {
-            setIsDownloading(false);
+        try {
+            await downloadCvPdf(cvData, 'francisco', profilePicture, personalInfo?.name);
             onFirstExport?.();
-        });
+        } catch (err) {
+            console.error('[HarvardTemplate] PDF error:', err);
+        } finally {
+            setIsDownloading(false);
+        }
     };
 
     return (

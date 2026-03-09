@@ -1,6 +1,45 @@
 /**
  * Shared PDF export utilities for CV templates.
  */
+import axiosInstance from '../api/axiosInstance';
+
+/**
+ * Requests a server-side PDF from the Puppeteer endpoint and immediately
+ * triggers a browser file-save/download — no window.print(), no page preview,
+ * works identically on Android, iOS, and desktop.
+ *
+ * @param {object} cvData          - Full CV data object.
+ * @param {string} templateId      - Template key (francisco|daniel|murad|jordi|andrea|carlos).
+ * @param {string|null} profilePicture - Base64 data-URL of the profile photo, or null.
+ * @param {string} personName      - Used to build the filename (e.g. "Josué Molina").
+ */
+export async function downloadCvPdf(cvData, templateId, profilePicture, personName) {
+    const response = await axiosInstance.post(
+        '/export/pdf',
+        { cvData, templateId, profilePicture: profilePicture || null },
+        { responseType: 'blob', timeout: 120_000 },
+    );
+
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = URL.createObjectURL(blob);
+
+    const safeName = (personName || 'MiCV')
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-zA-Z0-9\s]/g, '')
+        .trim()
+        .replace(/\s+/g, '_') || 'MiCV';
+
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `CV_${safeName}.pdf`;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    // Revoke after a short delay to allow the download to start
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
 
 /**
  * Fixes profile images in a cloned DOM element so that html2canvas renders
@@ -111,27 +150,8 @@ export function formatReferenceLine(reference) {
 }
 
 export function openCvPrint(onAfterPrint) {
-    document.body.classList.add('cv-print-mode');
-
-    let done = false;
-    const finish = () => {
-        if (done) return;
-        done = true;
-        document.body.classList.remove('cv-print-mode');
-        window.removeEventListener('afterprint', finish);
-        // On mobile (Android Chrome) "afterprint" fires the moment the user taps
-        // "Save as PDF", BEFORE the OS file-save dialog closes.  If we call
-        // onAfterPrint() synchronously here, React renders the success modal into
-        // the DOM while the OS is still showing its live page preview → the modal
-        // ends up captured inside the PDF.  A short delay lets the OS dialog fully
-        // finish before we mutate the page.
-        setTimeout(() => onAfterPrint?.(), 1600);
-    };
-
-    // afterprint fires when the print dialog closes (cancel or print)
-    window.addEventListener('afterprint', finish);
-    // Safety: clean up after 2 min in case afterprint never fires
-    setTimeout(finish, 120_000);
-
-    requestAnimationFrame(() => window.print());
+    // Kept for backwards compatibility but no longer used.
+    // New templates use downloadCvPdf (server-side Puppeteer) instead.
+    console.warn('[pdfUtils] openCvPrint is deprecated. Use downloadCvPdf instead.');
+    onAfterPrint?.();
 }
