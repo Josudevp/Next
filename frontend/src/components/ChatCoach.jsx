@@ -868,7 +868,7 @@ const ChatCoach = () => {
 
         {/* ── MOBILE CV PREVIEW OVERLAY ─────────────────────────────────────── */}
         {isCvMode && showMobilePreview && (
-            <div className="lg:hidden fixed inset-0 z-50 flex min-h-0 flex-col bg-white">
+            <div className="cv-print-hide lg:hidden fixed inset-0 z-50 flex min-h-0 flex-col bg-white">
                 {/* Header del overlay */}
                 <div className="flex items-center justify-between px-4 h-14 border-b border-gray-100 flex-shrink-0">
                     <span className="text-sm font-bold text-gray-700">Vista previa del CV</span>
