@@ -119,7 +119,13 @@ export function openCvPrint(onAfterPrint) {
         done = true;
         document.body.classList.remove('cv-print-mode');
         window.removeEventListener('afterprint', finish);
-        onAfterPrint?.();
+        // On mobile (Android Chrome) "afterprint" fires the moment the user taps
+        // "Save as PDF", BEFORE the OS file-save dialog closes.  If we call
+        // onAfterPrint() synchronously here, React renders the success modal into
+        // the DOM while the OS is still showing its live page preview → the modal
+        // ends up captured inside the PDF.  A short delay lets the OS dialog fully
+        // finish before we mutate the page.
+        setTimeout(() => onAfterPrint?.(), 1600);
     };
 
     // afterprint fires when the print dialog closes (cancel or print)
