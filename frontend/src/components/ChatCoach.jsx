@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react';
-import { Bot, Send, User, Loader2, ChevronLeft, Mic, MicOff, PlayCircle, SquareSquare, Activity, CheckCircle, AlertCircle } from 'lucide-react';
+import { Bot, Send, User, Loader2, ChevronLeft, Mic, MicOff, PlayCircle, SquareSquare, Activity, CheckCircle, AlertCircle, FileText, X } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { useNavigate, useLocation } from 'react-router-dom';
 import LogoNext from '../components/LogoNext';
 import Robot3D from '../components/Robot3D';
 import axiosInstance from '../api/axiosInstance';
+import TemplateManager from './TemplateManager';
 
 const ChatCoach = () => {
     const navigate = useNavigate();
@@ -23,6 +24,15 @@ const ChatCoach = () => {
 
     // null = sin modal | { status: 'generating' | 'ready' | 'error' }
     const [cvModal, setCvModal] = useState(null);
+
+    // Plantilla activa (puede cambiar desde el selector sin perder datos)
+    const [selectedTemplate, setSelectedTemplate] = useState(templateId);
+    // Vista previa CV en mobile
+    const [showMobilePreview, setShowMobilePreview] = useState(false);
+
+    // Datos del CV que se construyen progresivamente durante la conversación
+    const [cvData, setCvData] = useState({});
+    const [profilePicture, setProfilePicture] = useState(null);
 
     // El chat empieza vacío — el /init endpoint genera el saludo personalizado
     const [messages, setMessages] = useState([]);
@@ -116,6 +126,14 @@ const ChatCoach = () => {
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
+
+    // Carga la foto de perfil del usuario al entrar en modo CV (para la vista previa)
+    useEffect(() => {
+        if (!isCvMode) return;
+        axiosInstance.get('/user/profile')
+            .then(r => setProfilePicture(r.data.profilePicture || null))
+            .catch(() => {});
+    }, [isCvMode]);
 
     // ── FIX BUG 3: Cleanup al desmontar el componente ────────────────────────
     // Garantiza que el TTS y el micrófono se detengan al navegar a otra página
@@ -297,28 +315,24 @@ const ChatCoach = () => {
         }
     };
 
-    // 6.5  Genera y descarga el archivo Word del CV llamando al backend
-    const generateAndDownloadCv = async (cvData) => {
+    // 6.5  Fusiona datos parciales del CV para la vista previa en tiempo real
+    const mergeCvData = (prev, next) => ({
+        ...prev, ...next,
+        personalInfo: { ...(prev.personalInfo || {}), ...(next.personalInfo || {}) },
+        skills:       { ...(prev.skills || {}),       ...(next.skills || {}) },
+        education:    (next.education?.length  > 0) ? next.education  : (prev.education  || []),
+        experience:   (next.experience?.length > 0) ? next.experience : (prev.experience || []),
+        languages:    (next.languages?.length  > 0) ? next.languages  : (prev.languages  || []),
+    });
+
+    // 6.6  Guarda los datos del CV en la base de datos (el PDF lo genera el frontend)
+    const saveCvData = async (cvJson) => {
         try {
-            // Preserve templateId from URL if the AI didn't inject it in the JSON
-            const payload = { ...cvData, templateId: cvData.templateId || templateId };
-            const response = await axiosInstance.post('/cv/generate', payload, {
-                responseType: 'blob',
-            });
-            const blob = new Blob([response.data], {
-                type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-            });
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `CV_${(payload.personalInfo?.name || 'MiCV').replace(/\s+/g, '_')}.docx`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
+            const payload = { ...cvJson, templateId: cvJson.templateId || selectedTemplate };
+            await axiosInstance.post('/cv/save', payload);
             setCvModal({ status: 'ready' });
         } catch (err) {
-            console.error('[generateAndDownloadCv]', err);
+            console.error('[saveCvData]', err);
             setCvModal({ status: 'error' });
         }
     };
@@ -342,28 +356,42 @@ const ChatCoach = () => {
                 history: messages.filter(m => m.id !== 'init' && !m.isError),
                 isInterviewMode,
                 isCvMode,
-                templateId,
+                templateId: selectedTemplate,
             };
 
             // El interceptor adjunta el token y gestiona el error 401 automáticamente
             const { data } = await axiosInstance.post('/coach/chat', requestBody);
             const aiReplyText = data.reply || 'No pude procesar tu solicitud, intenta de nuevo';
 
+            // ── Extracción de datos parciales del CV (actualiza la vista previa) ──
+            let displayText = aiReplyText;
+            if (isCvMode) {
+                const partialMatch = aiReplyText.match(/\[CV_PARTIAL\]([\s\S]*?)\[\/CV_PARTIAL\]/);
+                if (partialMatch) {
+                    try {
+                        const partialJson = JSON.parse(partialMatch[1].trim());
+                        setCvData(prev => mergeCvData(prev, partialJson));
+                    } catch { /* ignorar errores de parseo parcial */ }
+                }
+                displayText = aiReplyText.replace(/\[CV_PARTIAL\][\s\S]*?\[\/CV_PARTIAL\]/g, '').trim();
+            }
+
             // ── Detección de datos finales de CV ─────────────────────────────
-            if (isCvMode && aiReplyText.includes('[CV_FINAL_DATA]')) {
-                const match = aiReplyText.match(/\[CV_FINAL_DATA\]([\s\S]*?)\[\/CV_FINAL_DATA\]/);
+            if (isCvMode && displayText.includes('[CV_FINAL_DATA]')) {
+                const match = displayText.match(/\[CV_FINAL_DATA\]([\s\S]*?)\[\/CV_FINAL_DATA\]/);
                 if (match) {
                     try {
                         const cvJson = JSON.parse(match[1].trim());
-                        const cleanReply = aiReplyText.split('[CV_FINAL_DATA]')[0].trim() ||
-                            '¡Perfecto! He recolectado toda la información. Generando tu CV profesional ahora...';
+                        const cleanReply = displayText.split('[CV_FINAL_DATA]')[0].trim() ||
+                            '¡Perfecto! He recolectado toda la información. Tu CV está listo en la vista previa.';
                         setMessages(prev => [...prev, {
                             id: (Date.now() + 1).toString(),
                             text: cleanReply,
                             sender: 'ai',
                         }]);
+                        setCvData(cvJson);
                         setCvModal({ status: 'generating' });
-                        generateAndDownloadCv(cvJson);
+                        saveCvData(cvJson);
                         return; // finally{} aún ejecuta setIsTyping(false)
                     } catch (parseErr) {
                         console.error('[ChatCoach] CV JSON parse error:', parseErr);
@@ -375,7 +403,7 @@ const ChatCoach = () => {
             // Añadir la respuesta de la IA
             const aiMsg = {
                 id: (Date.now() + 1).toString(),
-                text: aiReplyText,
+                text: displayText,
                 sender: 'ai'
             };
 
@@ -383,8 +411,8 @@ const ChatCoach = () => {
 
             // Si es entrevista, el coach reacciona usando su voz
             // Regla de Silencio: NUNCA leer en voz alta los reportes finales ni hablar si ya terminó la simulación
-            if (isInterviewMode && !aiReplyText.includes('REPORTE') && !aiReplyText.includes('Reporte')) {
-                speakText(aiReplyText);
+            if (isInterviewMode && !displayText.includes('REPORTE') && !displayText.includes('Reporte')) {
+                speakText(displayText);
             }
 
         } catch (error) {
@@ -493,12 +521,15 @@ const ChatCoach = () => {
                         <span className="hidden sm:inline">Volver al Dashboard</span>
                     </button>
 
-                    {/* Botón de simulación — solo visible en móvil (lg:hidden) */}
+                    {/* Botón CV preview — solo visible en móvil en modo CV */}
                     <div className="lg:hidden flex-1 flex justify-center">
                         {isCvMode ? (
-                            <span className="text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full">
-                                Creando tu Hoja de Vida
-                            </span>
+                            <button
+                                onClick={() => setShowMobilePreview(true)}
+                                className="flex items-center gap-1.5 text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100 px-3 py-1.5 rounded-full transition-all cursor-pointer"
+                            >
+                                <FileText size={13} /> Ver mi CV
+                            </button>
                         ) : isInterviewMode ? (
                             <button
                                 onClick={stopInterview}
@@ -519,7 +550,6 @@ const ChatCoach = () => {
                     </div>
 
                     <div className="ml-auto lg:ml-0">
-                        <LogoNext to="/dashboard" />
                     </div>
                 </div>
 
@@ -664,7 +694,17 @@ const ChatCoach = () => {
                 )}
             </div>
 
-            {/* ── COLUMNA DERECHA (40%): INTERACTIVE HUB ── */}
+            {/* ── COLUMNA DERECHA (40%): CV Preview (modo CV) o Interactive Hub ── */}
+            {isCvMode ? (
+                <div className="hidden lg:flex w-[40%] h-full flex-col border-l border-gray-100 overflow-hidden">
+                    <TemplateManager
+                        templateId={selectedTemplate}
+                        cvData={cvData}
+                        profilePicture={profilePicture}
+                        onChangeTemplate={setSelectedTemplate}
+                    />
+                </div>
+            ) : (
             <div className="hidden lg:flex w-[40%] h-full min-h-[500px] flex-col bg-gradient-to-br from-[#0B1120] to-[#1E293B] relative overflow-hidden">
 
                 {/* Ambientes decorativos y blur */}
@@ -751,8 +791,34 @@ const ChatCoach = () => {
                 </div>
 
             </div>
+            )}
 
-        </div >
+        </div>
+
+        {/* ── MOBILE CV PREVIEW OVERLAY ─────────────────────────────────────── */}
+        {isCvMode && showMobilePreview && (
+            <div className="lg:hidden fixed inset-0 z-50 flex flex-col bg-white">
+                {/* Header del overlay */}
+                <div className="flex items-center justify-between px-4 h-14 border-b border-gray-100 flex-shrink-0">
+                    <span className="text-sm font-bold text-gray-700">Vista previa del CV</span>
+                    <button
+                        onClick={() => setShowMobilePreview(false)}
+                        className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors cursor-pointer"
+                    >
+                        <X size={18} className="text-gray-500" />
+                    </button>
+                </div>
+                {/* TemplateManager ocupa el resto */}
+                <div className="flex-1 min-h-0">
+                    <TemplateManager
+                        templateId={selectedTemplate}
+                        cvData={cvData}
+                        profilePicture={profilePicture}
+                        onChangeTemplate={(id) => { setSelectedTemplate(id); }}
+                    />
+                </div>
+            </div>
+        )}
 
         {/* ── MODAL DE GENERACIÓN DE CV ─────────────────────────────────────── */}
         {cvModal && (
@@ -763,16 +829,16 @@ const ChatCoach = () => {
                             <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-4 rounded-full bg-blue-50 flex items-center justify-center">
                                 <Loader2 size={28} className="text-[#2563EB] animate-spin" />
                             </div>
-                            <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-2">Generando tu CV...</h3>
-                            <p className="text-sm text-gray-500">Creando tu archivo Word con diseño Harvard profesional.</p>
+                            <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-2">Guardando tu CV...</h3>
+                            <p className="text-sm text-gray-500">Estamos guardando tu información en la nube.</p>
                         </>
                     ) : cvModal.status === 'ready' ? (
                         <>
                             <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-4 rounded-full bg-green-50 flex items-center justify-center">
                                 <CheckCircle size={28} className="text-green-500" />
                             </div>
-                            <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-2">¡CV generado con éxito!</h3>
-                            <p className="text-sm text-gray-500 mb-5">Tu archivo .docx se ha descargado automáticamente.</p>
+                            <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-2">¡CV guardado con éxito!</h3>
+                            <p className="text-sm text-gray-500 mb-5">Tu CV está listo. Descárgalo en PDF desde la vista previa.</p>
                             <button
                                 onClick={() => setCvModal(null)}
                                 className="px-6 py-2.5 bg-[#2563EB] text-white rounded-xl font-semibold text-sm hover:bg-blue-700 transition cursor-pointer"
@@ -785,7 +851,7 @@ const ChatCoach = () => {
                             <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-4 rounded-full bg-red-50 flex items-center justify-center">
                                 <AlertCircle size={28} className="text-red-500" />
                             </div>
-                            <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-2">Error al generar el archivo Word</h3>
+                            <h3 className="text-base sm:text-lg font-bold text-gray-800 mb-2">Error al guardar el CV</h3>
                             <p className="text-sm text-gray-500 mb-5">Ocurrió un error. Intenta de nuevo más tarde.</p>
                             <button
                                 onClick={() => setCvModal(null)}

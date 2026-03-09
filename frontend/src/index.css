@@ -79,4 +79,15 @@ body,
 
 .animate-fade-in {
   animation: fadeIn 0.3s ease forwards;
-}@plugin '@tailwindcss/typography';
+}
+
+/* ── Ocultar scrollbar en carruseles ───────────────────────────────────────── */
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+@plugin '@tailwindcss/typography';

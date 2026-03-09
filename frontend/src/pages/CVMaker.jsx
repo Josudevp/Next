@@ -86,7 +86,7 @@ const TEMPLATES = [
     name: 'Daniel',
     style: 'Modern Blue',
     description: 'Panel azul marino izquierdo con foto circular destacada. Elegante y moderno.',
-    accent: '#0F2B4C',
+    accent: '#436696',
     bg: '#F7F9FC',
     layout: 'modernblue',
     badge: 'Elegante',
@@ -260,7 +260,7 @@ const TemplatePreview = ({ template }) => {
     daniel: (
       <svg viewBox="0 0 120 160" className="w-full h-full" xmlns="http://www.w3.org/2000/svg">
         <rect width="120" height="160" fill="#F7F9FC" />
-        <rect width="38" height="160" fill="#0F2B4C" />
+        <rect width="38" height="160" fill="#436696" />
         <circle cx="19" cy="38" r="20" fill="#1A3E6E" stroke="#FFF" strokeWidth="2" />
         <rect x="4" y="68" width="30" height="4" rx="1" fill="#FFF" opacity="0.9" />
         <rect x="6" y="76" width="26" height="2" rx="1" fill="#FFF" opacity="0.5" />
@@ -269,7 +269,7 @@ const TemplatePreview = ({ template }) => {
         <rect x="6" y="91" width="22" height="2" rx="1" fill="#FFF" opacity="0.4" />
         <rect x="6" y="106" width="26" height="2" rx="1" fill="#FFF" opacity="0.4" />
         <rect x="6" y="111" width="22" height="2" rx="1" fill="#FFF" opacity="0.3" />
-        <rect x="46" y="10" width="65" height="7" rx="1" fill="#0F2B4C" />
+        <rect x="46" y="10" width="65" height="7" rx="1" fill="#436696" />
         <rect x="46" y="20" width="45" height="2" rx="1" fill="#666" />
         <rect x="46" y="35" width="65" height="3" rx="1" fill="#3B7DD8" />
         <rect x="46" y="42" width="58" height="2" rx="1" fill="#666" />

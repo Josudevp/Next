@@ -23,6 +23,14 @@ const Home = () => {
                 <LogoNext />
             </nav>
 
+            {/* BETA badge */}
+            <div className='absolute top-4 right-5 z-20 sm:right-6 md:top-6 md:right-10 lg:right-16'>
+                <span className='inline-flex items-center gap-1.5 bg-[#2563EB]/10 border border-[#2563EB]/30 text-[#2563EB] text-[11px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full'>
+                    <span className='w-1.5 h-1.5 rounded-full bg-[#2563EB] animate-pulse' />
+                    Beta
+                </span>
+            </div>
+
             <div className='pointer-events-none absolute inset-x-0 bottom-0 h-[42vh] bg-linear-to-t from-[#5F7FB5]/80 via-[#AFC1E7]/35 to-transparent' />
 
             {/* Hero Section */}
