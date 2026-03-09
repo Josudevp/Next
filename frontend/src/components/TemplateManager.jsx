@@ -25,7 +25,7 @@ const TEMPLATES_CONFIG = [
     { id: 'daniel',    name: 'Modern Blue',    accent: '#436696', ready: true },
     { id: 'murad',     name: 'Tech Dev',       accent: '#16A34A', ready: true },
     { id: 'jordi',     name: 'Executive',      accent: '#1E5F5F', ready: true },
-    { id: 'andrea',    name: 'Creative',       accent: '#C2410C', ready: true },
+    { id: 'andrea',    name: 'Creative',       accent: '#2596BE', ready: true },
     { id: 'carlos',    name: 'Corporate',      accent: '#1E293B', ready: true },
 ];
 
@@ -78,24 +78,24 @@ const THUMBNAILS = {
     andrea: (
         <svg viewBox="0 0 60 80" className="w-full h-full">
             <rect width="60" height="80" fill="#FFF" />
-            {/* Purple banner */}
-            <rect width="60" height="26" fill="#FFEDD5" />
-            <circle cx="11" cy="13" r="7" fill="#FED7AA" stroke="#C2410C" strokeWidth="1.5" />
+            {/* Blue banner */}
+            <rect width="60" height="26" fill="#E9F6FB" />
+            <circle cx="11" cy="13" r="7" fill="#BFE7F3" stroke="#2596BE" strokeWidth="1.5" />
             <rect x="22" y="7" width="32" height="4" rx="0.5" fill="#FFF" />
             <rect x="22" y="14" width="24" height="1.5" rx="0.5" fill="rgba(255,255,255,0.7)" />
             <rect x="22" y="18" width="20" height="1" rx="0.5" fill="rgba(255,255,255,0.5)" />
             {/* Two-column body */}
-            <rect x="4" y="30" width="30" height="1.5" rx="0.5" fill="#C2410C" />
+            <rect x="4" y="30" width="30" height="1.5" rx="0.5" fill="#2596BE" />
             <rect x="4" y="35" width="28" height="0.8" rx="0.5" fill="#555" />
             <rect x="4" y="38" width="26" height="0.8" rx="0.5" fill="#999" />
             <rect x="4" y="41" width="28" height="0.8" rx="0.5" fill="#999" />
-            <rect x="4" y="48" width="30" height="1.5" rx="0.5" fill="#C2410C" />
+            <rect x="4" y="48" width="30" height="1.5" rx="0.5" fill="#2596BE" />
             <rect x="4" y="53" width="26" height="0.8" rx="0.5" fill="#555" />
             <rect x="4" y="56" width="24" height="0.8" rx="0.5" fill="#999" />
-            <rect x="37" y="30" width="19" height="1.5" rx="0.5" fill="#C2410C" />
+            <rect x="37" y="30" width="19" height="1.5" rx="0.5" fill="#2596BE" />
             <rect x="37" y="35" width="17" height="0.8" rx="0.5" fill="#555" />
             <rect x="37" y="38" width="15" height="0.8" rx="0.5" fill="#999" />
-            <rect x="37" y="48" width="19" height="1.5" rx="0.5" fill="#C2410C" />
+            <rect x="37" y="48" width="19" height="1.5" rx="0.5" fill="#2596BE" />
             <rect x="37" y="53" width="16" height="0.8" rx="0.5" fill="#999" />
         </svg>
     ),
@@ -205,7 +205,7 @@ const TemplateCarousel = ({ selectedId, onSelect }) => {
 
     return (
         <div
-            className="relative flex-shrink-0 bg-white border-b border-gray-100"
+            className="cv-template-carousel relative flex-shrink-0 bg-white border-b border-gray-100"
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
         >
@@ -300,18 +300,18 @@ const TemplateCarousel = ({ selectedId, onSelect }) => {
 // ══════════════════════════════════════════════════════════════════════════════
 // TemplateManager
 // ══════════════════════════════════════════════════════════════════════════════
-const TemplateManager = ({ templateId, cvData, profilePicture, onChangeTemplate }) => {
+const TemplateManager = ({ templateId, cvData, profilePicture, onChangeTemplate, onFirstExport }) => {
     const currentId = TEMPLATE_REGISTRY[templateId] ? templateId : DEFAULT_TEMPLATE;
     const { Component } = TEMPLATE_REGISTRY[currentId];
 
     return (
-        <div className="flex flex-col h-full">
+        <div className="cv-print-tm flex h-full min-h-0 flex-col">
             {/* Carrusel de plantillas */}
             <TemplateCarousel selectedId={currentId} onSelect={onChangeTemplate} />
 
             {/* Renderizado de la plantilla activa */}
-            <div className="flex-1 overflow-hidden">
-                <Component cvData={cvData} profilePicture={profilePicture} />
+            <div className="cv-print-content flex-1 min-h-0 overflow-hidden">
+                <Component cvData={cvData} profilePicture={profilePicture} onFirstExport={onFirstExport} />
             </div>
         </div>
     );

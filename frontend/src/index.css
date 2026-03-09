@@ -90,4 +90,114 @@ body,
   -ms-overflow-style: none;
 }
 
+@media print {
+  @page {
+    size: auto;
+    margin: 0;
+  }
+
+  html,
+  body,
+  #root {
+    height: auto !important;
+    min-height: 0 !important;
+    background: #fff !important;
+    overflow: visible !important;
+  }
+
+  /* ── Force color/background rendering in print ── */
+  body.cv-print-mode .cv-print-shell,
+  body.cv-print-mode .cv-print-shell * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
+  /* ── Root chat layout: revert to block so children stack vertically ── */
+  body.cv-print-mode .cv-print-main {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* ── Hide the left chat column ── */
+  body.cv-print-mode .cv-print-chat {
+    display: none !important;
+  }
+
+  /* ── Template panel: override hidden + make full-width ── */
+  body.cv-print-mode .cv-print-wrap {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    border: none !important;
+  }
+
+  /* ── TemplateManager root ── */
+  body.cv-print-mode .cv-print-tm {
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* ── TemplateManager inner content wrapper ── */
+  body.cv-print-mode .cv-print-content {
+    overflow: visible !important;
+    height: auto !important;
+    flex: none !important;
+  }
+
+  /* ── Hide carousel, toolbar, and other UI chrome ── */
+  body.cv-print-mode .cv-template-carousel,
+  body.cv-print-mode .cv-print-toolbar,
+  body.cv-print-mode .cv-print-hide {
+    display: none !important;
+  }
+
+  /* ── Shell (template root) ── */
+  body.cv-print-mode .cv-print-shell {
+    display: flex !important;
+    flex-direction: column !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* ── Scroll area ── */
+  body.cv-print-mode .cv-print-scroll {
+    display: block !important;
+    overflow: visible !important;
+    height: auto !important;
+    background: #fff !important;
+    padding: 0 !important;
+  }
+
+  /* ── Scale wrapper: remove inline size constraints ── */
+  body.cv-print-mode .cv-print-scale-box {
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    margin: 0 !important;
+  }
+
+  /* ── CV document: remove transform and shadow ── */
+  body.cv-print-mode .cv-print-document {
+    width: 100% !important;
+    height: auto !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+    overflow: visible !important;
+  }
+
+  /* ── Pagination: avoid breaking inside entries/sections ── */
+  body.cv-print-mode .cv-print-entry,
+  body.cv-print-mode .cv-print-section {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}
+
 @plugin '@tailwindcss/typography';

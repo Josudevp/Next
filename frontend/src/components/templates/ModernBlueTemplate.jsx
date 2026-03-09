@@ -1,14 +1,13 @@
 import { useRef, useState, useEffect } from 'react';
 import { Download, Loader2, FileText, Phone, Mail, Linkedin, Github, Globe, MapPin } from 'lucide-react';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { openCvPrint, sortByDateDesc, normalizeReferenceGroups, formatReferenceLine } from '../../utils/pdfUtils';
 
 // Letter (8.5 × 11 in) at 96 dpi ≈ 816 × 1056 px
 const LETTER_PX_W = 816;
 const LETTER_PX_H = 1056;
 const SIDEBAR_W = 272; // ~1/3 del ancho Letter
 
-const ModernBlueTemplate = ({ cvData = {}, profilePicture = null }) => {
+const ModernBlueTemplate = ({ cvData = {}, profilePicture = null, onFirstExport }) => {
     const cvRef = useRef(null);
     const scrollRef = useRef(null);
     const [isDownloading, setIsDownloading] = useState(false);
@@ -37,16 +36,19 @@ const ModernBlueTemplate = ({ cvData = {}, profilePicture = null }) => {
     const {
         personalInfo = {},
         summary,
-        education = [],
-        experience = [],
+        education: rawEdu = [],
+        experience: rawExp = [],
         skills = {},
         languages = [],
         includePhoto,
     } = cvData;
+    const experience = sortByDateDesc(rawExp);
+    const education  = sortByDateDesc(rawEdu);
 
     const techSkills = Array.isArray(skills?.technical) ? skills.technical : [];
     const softSkills = Array.isArray(skills?.soft) ? skills.soft : [];
     const allSkills = [...new Set([...techSkills, ...softSkills])].filter(Boolean);
+    const { workReferences, personalReferences } = normalizeReferenceGroups(cvData);
 
     const validLangs = Array.isArray(languages)
         ? languages.filter(l => l && (l.language || typeof l === 'string'))
@@ -64,81 +66,14 @@ const ModernBlueTemplate = ({ cvData = {}, profilePicture = null }) => {
         { icon: MapPin, value: personalInfo.address },
     ].filter(item => item.value);
 
-    // ── PDF Download ──
-    const handleDownloadPDF = async () => {
+    // ── Native browser print ──
+    const handleDownloadPDF = () => {
         if (!cvRef.current || !hasData) return;
         setIsDownloading(true);
-        let exportHost = null;
-        try {
-            const el = cvRef.current;
-            exportHost = document.createElement('div');
-            exportHost.style.position = 'fixed';
-            exportHost.style.left = '-10000px';
-            exportHost.style.top = '0';
-            exportHost.style.width = `${LETTER_PX_W}px`;
-            exportHost.style.background = '#ffffff';
-            exportHost.style.padding = '0';
-            exportHost.style.margin = '0';
-            exportHost.style.overflow = 'visible';
-            exportHost.style.zIndex = '-1';
-
-            const clone = el.cloneNode(true);
-            clone.style.transform = 'none';
-            clone.style.transformOrigin = 'top left';
-            clone.style.width = `${LETTER_PX_W}px`;
-            clone.style.margin = '0';
-            clone.style.boxShadow = 'none';
-
-            exportHost.appendChild(clone);
-            document.body.appendChild(exportHost);
-
-            if (document.fonts?.ready) await document.fonts.ready;
-
-            const canvas = await html2canvas(clone, {
-                scale: 2,
-                useCORS: true,
-                allowTaint: true,
-                backgroundColor: '#ffffff',
-                logging: false,
-                width: LETTER_PX_W,
-                windowWidth: LETTER_PX_W,
-                scrollX: 0, scrollY: 0, x: 0, y: 0,
-            });
-
-            document.body.removeChild(exportHost);
-            exportHost = null;
-
-            if (!canvas.width || !canvas.height) throw new Error('Canvas vacío.');
-
-            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
-            const pdfW = pdf.internal.pageSize.getWidth();
-            const pdfH = pdf.internal.pageSize.getHeight();
-            const imgData = canvas.toDataURL('image/png');
-            const marginMm = 0; // sin márgenes extras, el sidebar llega al borde
-            const maxW = pdfW - marginMm * 2;
-            const maxH = pdfH - marginMm * 2;
-            const aspect = canvas.width / canvas.height;
-
-            if (!Number.isFinite(aspect) || aspect <= 0) throw new Error('Aspect inválido.');
-
-            let renderW = maxW;
-            let renderH = renderW / aspect;
-            if (renderH > maxH) { renderH = maxH; renderW = renderH * aspect; }
-
-            const offsetX = (pdfW - renderW) / 2;
-            const offsetY = 0;
-            pdf.addImage(imgData, 'PNG', offsetX, offsetY, renderW, renderH, undefined, 'FAST');
-
-            const safeName = (personalInfo.name || 'MiCV')
-                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-                .replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
-            pdf.save(`CV_${safeName}.pdf`);
-        } catch (err) {
-            console.error('[ModernBlueTemplate] Error PDF:', err);
-        } finally {
-            if (exportHost?.parentNode) exportHost.parentNode.removeChild(exportHost);
+        openCvPrint(() => {
             setIsDownloading(false);
-        }
+            onFirstExport?.();
+        });
     };
 
     // ── Sidebar section heading ──
@@ -160,9 +95,9 @@ const ModernBlueTemplate = ({ cvData = {}, profilePicture = null }) => {
     );
 
     return (
-        <div className="flex flex-col h-full bg-white">
+        <div className="cv-print-shell flex h-full min-h-0 flex-col bg-white">
             {/* Header */}
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 flex-shrink-0">
+            <div className="cv-print-toolbar flex items-center justify-between px-4 py-2.5 border-b border-gray-100 flex-shrink-0">
                 <div>
                     <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Vista Previa · Modern Blue</p>
                     {hasData && personalInfo.name && (
@@ -180,7 +115,7 @@ const ModernBlueTemplate = ({ cvData = {}, profilePicture = null }) => {
             </div>
 
             {/* Scroll area */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden bg-gray-100 p-4 flex flex-col items-center">
+            <div ref={scrollRef} className="cv-print-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-gray-100 p-4 flex flex-col items-center">
                 {!hasData ? (
                     <div className="flex flex-col items-center justify-center h-full text-center gap-3 py-16">
                         <div className="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center">
@@ -192,7 +127,7 @@ const ModernBlueTemplate = ({ cvData = {}, profilePicture = null }) => {
                         </p>
                     </div>
                 ) : (
-                    <div style={{
+                    <div className="cv-print-scale-box" style={{
                         width: `${LETTER_PX_W * scale}px`,
                         height: `${cvNaturalH * scale}px`,
                         margin: 'auto',
@@ -200,12 +135,13 @@ const ModernBlueTemplate = ({ cvData = {}, profilePicture = null }) => {
                     }}>
                         {/* ── A4 Sheet ── */}
                         <div
+                            className="cv-print-document"
                             ref={cvRef}
                             id="cv-a4-preview"
                             style={{
                                 width: `${LETTER_PX_W}px`,
                                 display: 'flex',
-                                backgroundColor: '#ffffff',
+                                background: `linear-gradient(to right, #436696 ${SIDEBAR_W}px, #ffffff ${SIDEBAR_W}px)`,
                                 boxShadow: '0 2px 20px rgba(0,0,0,0.14)',
                                 fontFamily: '"Inter", "Segoe UI", system-ui, sans-serif',
                                 color: '#1a1a1a',
@@ -218,7 +154,6 @@ const ModernBlueTemplate = ({ cvData = {}, profilePicture = null }) => {
                             <div style={{
                                 width: `${SIDEBAR_W}px`,
                                 flexShrink: 0,
-                                backgroundColor: '#436696',
                                 color: '#ffffff',
                                 padding: '28px 22px 28px 22px',
                                 display: 'flex',
@@ -311,6 +246,7 @@ const ModernBlueTemplate = ({ cvData = {}, profilePicture = null }) => {
                                         </div>
                                     </>
                                 )}
+
                             </div>
 
                             {/* ════════════ MAIN BODY ════════════ */}
@@ -349,9 +285,9 @@ const ModernBlueTemplate = ({ cvData = {}, profilePicture = null }) => {
                                 {experience.length > 0 && (
                                     <>
                                         <BodyHeading>Experiencia Laboral</BodyHeading>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                        <div className="cv-print-section" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                                             {experience.map((ex, i) => (
-                                                <div key={i}>
+                                                <div className="cv-print-entry" key={i}>
                                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' }}>
                                                         <span style={{ fontSize: '9.5pt', fontWeight: '700', color: '#111', flex: 1 }}>
                                                             {ex.position || ex.title || ''}
@@ -388,9 +324,9 @@ const ModernBlueTemplate = ({ cvData = {}, profilePicture = null }) => {
                                 {education.length > 0 && (
                                     <>
                                         <BodyHeading>Educación</BodyHeading>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                        <div className="cv-print-section" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                                             {education.map((ed, i) => (
-                                                <div key={i}>
+                                                <div className="cv-print-entry" key={i}>
                                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' }}>
                                                         <span style={{ fontSize: '10.5pt', fontWeight: '700', color: '#111', flex: 1 }}>
                                                             {ed.degree || ''}
@@ -410,6 +346,32 @@ const ModernBlueTemplate = ({ cvData = {}, profilePicture = null }) => {
                                                         </p>
                                                     )}
                                                 </div>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+
+                                {workReferences.length > 0 && (
+                                    <>
+                                        <BodyHeading>Referencias Laborales</BodyHeading>
+                                        <div className="cv-print-section" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                            {workReferences.map((reference, i) => (
+                                                <p className="cv-print-entry" key={`work-${i}`} style={{ fontSize: '9.3pt', color: '#555', lineHeight: '1.65', margin: 0 }}>
+                                                    {formatReferenceLine(reference)}
+                                                </p>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+
+                                {personalReferences.length > 0 && (
+                                    <>
+                                        <BodyHeading>Referencias Personales</BodyHeading>
+                                        <div className="cv-print-section" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                            {personalReferences.map((reference, i) => (
+                                                <p className="cv-print-entry" key={`personal-${i}`} style={{ fontSize: '9.3pt', color: '#555', lineHeight: '1.65', margin: 0 }}>
+                                                    {formatReferenceLine(reference)}
+                                                </p>
                                             ))}
                                         </div>
                                     </>

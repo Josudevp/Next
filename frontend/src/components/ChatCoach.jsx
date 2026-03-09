@@ -16,6 +16,9 @@ const ChatCoach = () => {
     // Plantilla seleccionada en CV Maker Hub — se propaga al backend en cada llamada
     const templateId = new URLSearchParams(location.search).get('templateId') || 'francisco';
 
+    // Clave de almacenamiento local para persistir conversación entre recargas
+    const chatStorageKey = isCvMode ? 'nextapp_cv_messages' : 'nextapp_coach_messages';
+
     // Job HuNTER: si venimos con datos de un empleo, prepara el prompt automático
     const pendingJobPrepRef = useRef(location.state?.jobPrep || null);
 
@@ -25,23 +28,44 @@ const ChatCoach = () => {
     // null = sin modal | { status: 'generating' | 'ready' | 'error' }
     const [cvModal, setCvModal] = useState(null);
 
+    // Modal post-exportación: null | 'confirm' | 'changes'
+    const [exportModal, setExportModal] = useState(null);
+
     // Plantilla activa (puede cambiar desde el selector sin perder datos)
     const [selectedTemplate, setSelectedTemplate] = useState(templateId);
     // Vista previa CV en mobile
     const [showMobilePreview, setShowMobilePreview] = useState(false);
 
-    // Datos del CV que se construyen progresivamente durante la conversación
-    const [cvData, setCvData] = useState({});
+    // Datos del CV — se restauran desde localStorage en modo CV
+    const [cvData, setCvData] = useState(() => {
+        if (!isCvMode) return {};
+        try {
+            const saved = localStorage.getItem('nextapp_cv_data');
+            return saved ? JSON.parse(saved) : {};
+        } catch { return {}; }
+    });
     const [profilePicture, setProfilePicture] = useState(null);
 
-    // El chat empieza vacío — el /init endpoint genera el saludo personalizado
-    const [messages, setMessages] = useState([]);
+    // Los mensajes se restauran desde localStorage al recargar
+    const [messages, setMessages] = useState(() => {
+        try {
+            const saved = localStorage.getItem(chatStorageKey);
+            return saved ? JSON.parse(saved) : [];
+        } catch { return []; }
+    });
     const [input, setInput] = useState('');
-    const [isTyping, setIsTyping] = useState(true); // true → muestra el loader de bienvenida
+    // Mostrar loader solo si arrancamos sin historial guardado
+    const [isTyping, setIsTyping] = useState(() => {
+        try {
+            const saved = localStorage.getItem(chatStorageKey);
+            return !saved || JSON.parse(saved).length === 0;
+        } catch { return true; }
+    });
     const [isListening, setIsListening] = useState(false);
 
     // Referencias
     const messagesEndRef = useRef(null);
+    const inputRef       = useRef(null);
     const recognitionRef = useRef(null);
     const isInterviewModeRef = useRef(isInterviewMode);
     const sendMessageRef = useRef(null);
@@ -59,6 +83,29 @@ const ChatCoach = () => {
     useEffect(() => {
         scrollToBottom();
     }, [messages, isTyping]);
+
+    // Persistir mensajes en localStorage para recuperar la sesión al recargar
+    useEffect(() => {
+        if (messages.length > 0) {
+            localStorage.setItem(chatStorageKey, JSON.stringify(messages));
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [messages]);
+
+    // Persistir datos del CV en localStorage (modo CV)
+    useEffect(() => {
+        if (isCvMode && Object.keys(cvData).length > 0) {
+            localStorage.setItem('nextapp_cv_data', JSON.stringify(cvData));
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [cvData]);
+
+    // Reenfocar el input tras cada respuesta de la IA (evita pérdida de foco)
+    useEffect(() => {
+        if (!isTyping && !isInterviewMode) {
+            setTimeout(() => inputRef.current?.focus(), 50);
+        }
+    }, [isTyping, isInterviewMode]);
 
     // Auto-envío del contexto de empleo tras recibir el saludo inicial
     useEffect(() => {
@@ -85,9 +132,16 @@ const ChatCoach = () => {
     }, [messages]);
 
     // 3. Saludo personalizado — GET /api/coach/init
+    // Solo se ejecuta si no hay historial guardado en localStorage.
     // Usamos un flag `cancelled` para evitar que StrictMode (doble ejecución en dev)
     // resetee el historial cuando la primera llamada llega después de que la segunda ya terminó.
     useEffect(() => {
+        // Si ya tenemos mensajes guardados, no hace falta pedir el saludo al servidor
+        if (messages.length > 0) {
+            setIsTyping(false);
+            return;
+        }
+
         let cancelled = false;
 
         const fetchInitGreeting = async () => {
@@ -323,6 +377,8 @@ const ChatCoach = () => {
         education:    (next.education?.length  > 0) ? next.education  : (prev.education  || []),
         experience:   (next.experience?.length > 0) ? next.experience : (prev.experience || []),
         languages:    (next.languages?.length  > 0) ? next.languages  : (prev.languages  || []),
+        workReferences: (next.workReferences?.length > 0) ? next.workReferences : (prev.workReferences || []),
+        personalReferences: (next.personalReferences?.length > 0) ? next.personalReferences : (prev.personalReferences || []),
     });
 
     // 6.6  Guarda los datos del CV en la base de datos (el PDF lo genera el frontend)
@@ -335,6 +391,19 @@ const ChatCoach = () => {
             console.error('[saveCvData]', err);
             setCvModal({ status: 'error' });
         }
+    };
+
+    // 6.7  Callback llamado por la plantilla tras exportar el PDF por primera vez
+    const handleFirstExport = () => {
+        if (isCvMode) setExportModal('confirm');
+    };
+
+    // Limpia toda la memoria de la sesión y vuelve al dashboard
+    const clearSessionAndExit = () => {
+        localStorage.removeItem(chatStorageKey);
+        localStorage.removeItem('nextapp_cv_data');
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        navigate('/dashboard');
     };
 
     // 6. Función para enviar mensajes (Chat normal o Simulación)
@@ -503,10 +572,10 @@ const ChatCoach = () => {
 
     return (
         <>
-        <div className="relative flex h-[100svh] min-h-[100svh] w-full overflow-hidden bg-white font-sans md:h-dvh md:min-h-dvh">
+        <div className="cv-print-main relative flex h-[100svh] min-h-[100svh] w-full overflow-hidden bg-white font-sans md:h-dvh md:min-h-dvh">
 
             {/* ── COLUMNA IZQUIERDA (60%): CHAT & INPUT ── */}
-            <div className="relative z-10 flex h-full min-h-0 w-full flex-1 flex-col border-r border-gray-100 bg-white shadow-[2px_0_15px_rgba(0,0,0,0.02)] lg:w-[60%] lg:flex-none">
+            <div className="cv-print-chat relative z-10 flex h-full min-h-0 w-full flex-1 flex-col border-r border-gray-100 bg-white shadow-[2px_0_15px_rgba(0,0,0,0.02)] lg:w-[60%] lg:flex-none">
 
                 {/* Header (Nav interno) */}
                 <div className="h-16 flex items-center px-4 sm:px-6 border-b border-gray-100 flex-shrink-0 gap-2">
@@ -630,6 +699,7 @@ const ChatCoach = () => {
 
                                 <div className="relative flex-1">
                                     <input
+                                        ref={inputRef}
                                         type="text"
                                         value={input}
                                         onChange={(e) => setInput(e.target.value)}
@@ -696,12 +766,13 @@ const ChatCoach = () => {
 
             {/* ── COLUMNA DERECHA (40%): CV Preview (modo CV) o Interactive Hub ── */}
             {isCvMode ? (
-                <div className="hidden lg:flex w-[40%] h-full flex-col border-l border-gray-100 overflow-hidden">
+                <div className="cv-print-wrap hidden lg:flex w-[40%] h-full min-h-0 flex-col border-l border-gray-100 overflow-hidden">
                     <TemplateManager
                         templateId={selectedTemplate}
                         cvData={cvData}
                         profilePicture={profilePicture}
                         onChangeTemplate={setSelectedTemplate}
+                        onFirstExport={handleFirstExport}
                     />
                 </div>
             ) : (
@@ -797,7 +868,7 @@ const ChatCoach = () => {
 
         {/* ── MOBILE CV PREVIEW OVERLAY ─────────────────────────────────────── */}
         {isCvMode && showMobilePreview && (
-            <div className="lg:hidden fixed inset-0 z-50 flex flex-col bg-white">
+            <div className="lg:hidden fixed inset-0 z-50 flex min-h-0 flex-col bg-white">
                 {/* Header del overlay */}
                 <div className="flex items-center justify-between px-4 h-14 border-b border-gray-100 flex-shrink-0">
                     <span className="text-sm font-bold text-gray-700">Vista previa del CV</span>
@@ -815,6 +886,7 @@ const ChatCoach = () => {
                         cvData={cvData}
                         profilePicture={profilePicture}
                         onChangeTemplate={(id) => { setSelectedTemplate(id); }}
+                        onFirstExport={handleFirstExport}
                     />
                 </div>
             </div>
@@ -859,6 +931,68 @@ const ChatCoach = () => {
                             >
                                 Cerrar
                             </button>
+                        </>
+                    )}
+                </div>
+            </div>
+        )}
+
+        {/* ── MODAL POST-EXPORTACIÓN DE CV ──────────────────────────────────── */}
+        {exportModal && (
+            <div className="fixed inset-0 bg-black/50 z-60 flex items-center justify-center p-4 animate-fade-in">
+                <div className="bg-white rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
+                    {exportModal === 'confirm' ? (
+                        <>
+                            <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-emerald-50 flex items-center justify-center">
+                                <CheckCircle size={28} className="text-emerald-500" />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-800 mb-2">¡CV exportado!</h3>
+                            <p className="text-sm text-gray-500 mb-6">
+                                ¿Deseas terminar la conversación y eliminar el progreso guardado?
+                            </p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={clearSessionAndExit}
+                                    className="flex-1 py-2.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-semibold text-sm transition cursor-pointer"
+                                >
+                                    Sí, terminar
+                                </button>
+                                <button
+                                    onClick={() => setExportModal('changes')}
+                                    className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold text-sm transition cursor-pointer"
+                                >
+                                    No, continuar
+                                </button>
+                            </div>
+                        </>
+                    ) : (
+                        <>
+                            <div className="w-14 h-14 mx-auto mb-4 rounded-full bg-blue-50 flex items-center justify-center">
+                                <FileText size={28} className="text-blue-500" />
+                            </div>
+                            <h3 className="text-lg font-bold text-gray-800 mb-2">¿Hacer cambios?</h3>
+                            <p className="text-sm text-gray-500 mb-6">
+                                ¿Quieres pedirle a la IA que corrija o mejore algo en tu CV?
+                            </p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => {
+                                        setExportModal(null);
+                                        setTimeout(() => {
+                                            sendMessageRef.current?.(null, 'Quiero hacer algunos cambios a mi CV. ¿Puedes ayudarme?');
+                                        }, 100);
+                                    }}
+                                    className="flex-1 py-2.5 bg-[#2563EB] hover:bg-blue-700 text-white rounded-xl font-semibold text-sm transition cursor-pointer"
+                                >
+                                    Sí, hacer cambios
+                                </button>
+                                <button
+                                    onClick={() => setExportModal(null)}
+                                    className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-semibold text-sm transition cursor-pointer"
+                                >
+                                    No, cerrar
+                                </button>
+                            </div>
                         </>
                     )}
                 </div>

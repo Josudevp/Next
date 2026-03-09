@@ -1,7 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { Download, Loader2, FileText } from 'lucide-react';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { openCvPrint, sortByDateDesc, normalizeReferenceGroups, formatReferenceLine } from '../../utils/pdfUtils';
 
 const LETTER_PX_W = 816;
 const LETTER_PX_H  = 1056;
@@ -25,7 +24,7 @@ const MainHead = ({ children }) => (
 );
 
 const MainEntry = ({ title, subtitle, dates, description }) => (
-    <div style={{ marginBottom: '16px' }}>
+    <div className="cv-print-entry" style={{ marginBottom: '16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' }}>
             <span style={{ fontSize: '10.5pt', fontWeight: '700', color: '#111', flex: 1 }}>{title}</span>
             {dates && <span style={{ fontSize: '8pt', color: '#888', flexShrink: 0 }}>{dates}</span>}
@@ -36,7 +35,7 @@ const MainEntry = ({ title, subtitle, dates, description }) => (
 );
 
 // ── Main Component ────────────────────────────────────────────────────────────
-const RightSidebarTemplate = ({ cvData = {}, profilePicture = null }) => {
+const RightSidebarTemplate = ({ cvData = {}, profilePicture = null, onFirstExport }) => {
     const cvRef     = useRef(null);
     const scrollRef = useRef(null);
     const [isDownloading, setIsDownloading] = useState(false);
@@ -58,12 +57,15 @@ const RightSidebarTemplate = ({ cvData = {}, profilePicture = null }) => {
         return () => ro.disconnect();
     }, []);
 
-    const { personalInfo = {}, summary, education = [], experience = [],
+    const { personalInfo = {}, summary, education: rawEdu = [], experience: rawExp = [],
             skills = {}, languages = [], includePhoto } = cvData;
+    const experience = sortByDateDesc(rawExp);
+    const education  = sortByDateDesc(rawEdu);
 
     const techSkills = Array.isArray(skills?.technical) ? skills.technical : [];
     const softSkills = Array.isArray(skills?.soft)      ? skills.soft      : [];
     const allSkills  = [...new Set([...techSkills, ...softSkills])].filter(Boolean);
+    const { workReferences, personalReferences } = normalizeReferenceGroups(cvData);
     const validLangs = Array.isArray(languages)
         ? languages.filter(l => l && (l.language || typeof l === 'string')) : [];
     const hasData = !!(personalInfo.name || summary || education.length || experience.length);
@@ -77,54 +79,20 @@ const RightSidebarTemplate = ({ cvData = {}, profilePicture = null }) => {
         { label: personalInfo.address },
     ].filter(c => c.label);
 
-    // ── PDF Export ────────────────────────────────────────────────────────────
-    const handleDownloadPDF = async () => {
+    // ── Native browser print ──────────────────────────────────────────────────
+    const handleDownloadPDF = () => {
         if (!cvRef.current || !hasData) return;
         setIsDownloading(true);
-        let exportHost = null;
-        try {
-            exportHost = document.createElement('div');
-            exportHost.style.cssText = `position:fixed;left:-10000px;top:0;width:${LETTER_PX_W}px;background:#fff;padding:0;margin:0;overflow:visible;z-index:-1`;
-            const clone = cvRef.current.cloneNode(true);
-            clone.style.transform = 'none';
-            clone.style.width     = `${LETTER_PX_W}px`;
-            clone.style.margin    = '0';
-            clone.style.boxShadow = 'none';
-            exportHost.appendChild(clone);
-            document.body.appendChild(exportHost);
-            if (document.fonts?.ready) await document.fonts.ready;
-            const canvas = await html2canvas(clone, {
-                scale: 2, useCORS: true, allowTaint: true,
-                backgroundColor: '#ffffff', logging: false,
-                width: LETTER_PX_W, windowWidth: LETTER_PX_W,
-                scrollX: 0, scrollY: 0, x: 0, y: 0,
-            });
-            document.body.removeChild(exportHost);
-            exportHost = null;
-            if (!canvas.width || !canvas.height) throw new Error('Canvas vacío');
-            const pdf  = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
-            const pdfW = pdf.internal.pageSize.getWidth();
-            const pdfH = pdf.internal.pageSize.getHeight();
-            const asp  = canvas.width / canvas.height;
-            let rW = pdfW, rH = rW / asp;
-            if (rH > pdfH) { rH = pdfH; rW = rH * asp; }
-            pdf.addImage(canvas.toDataURL('image/png'), 'PNG', (pdfW - rW) / 2, 0, rW, rH, undefined, 'FAST');
-            const safe = (personalInfo.name || 'MiCV')
-                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-                .replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
-            pdf.save(`CV_${safe}.pdf`);
-        } catch (err) {
-            console.error('[RightSidebarTemplate] PDF error:', err);
-        } finally {
-            if (exportHost?.parentNode) exportHost.parentNode.removeChild(exportHost);
+        openCvPrint(() => {
             setIsDownloading(false);
-        }
+            onFirstExport?.();
+        });
     };
 
     return (
-        <div className="flex flex-col h-full bg-white">
+        <div className="cv-print-shell flex h-full min-h-0 flex-col bg-white">
             {/* ── Header bar ── */}
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 shrink-0">
+            <div className="cv-print-toolbar flex items-center justify-between px-4 py-2.5 border-b border-gray-100 shrink-0">
                 <div>
                     <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Vista Previa · Corporate</p>
                     {hasData && personalInfo.name && (
@@ -142,7 +110,7 @@ const RightSidebarTemplate = ({ cvData = {}, profilePicture = null }) => {
             </div>
 
             {/* ── Scroll area ── */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden bg-gray-100 p-4 flex flex-col items-center">
+            <div ref={scrollRef} className="cv-print-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-gray-100 p-4 flex flex-col items-center">
                 {!hasData ? (
                     <div className="flex flex-col items-center justify-center h-full text-center gap-3 py-16">
                         <div className="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center">
@@ -154,13 +122,14 @@ const RightSidebarTemplate = ({ cvData = {}, profilePicture = null }) => {
                         </p>
                     </div>
                 ) : (
-                    <div style={{ width: `${LETTER_PX_W * scale}px`, height: `${cvNaturalH * scale}px`, margin: 'auto', overflow: 'hidden' }}>
+                    <div className="cv-print-scale-box" style={{ width: `${LETTER_PX_W * scale}px`, height: `${cvNaturalH * scale}px`, margin: 'auto', overflow: 'hidden' }}>
                         <div
+                            className="cv-print-document"
                             ref={cvRef}
                             style={{
                                 width: `${LETTER_PX_W}px`, minHeight: `${LETTER_PX_H}px`,
                                 display: 'flex',
-                                backgroundColor: '#ffffff',
+                                background: `linear-gradient(to left, ${SIDEBAR_BG} ${SIDEBAR_W}px, #ffffff ${SIDEBAR_W}px)`,
                                 boxShadow: '0 2px 20px rgba(0,0,0,0.14)',
                                 fontFamily: BODY_FONT, color: '#1a1a1a',
                                 transformOrigin: 'top left', transform: `scale(${scale})`,
@@ -169,7 +138,7 @@ const RightSidebarTemplate = ({ cvData = {}, profilePicture = null }) => {
                             {/* ── Main body (left) ── */}
                             <div style={{ flex: 1, padding: '36px 36px 48px 40px', minWidth: 0 }}>
                                 {/* Name + Title */}
-                                <h1 style={{ fontSize: '28pt', fontWeight: '800', color: '#111', margin: 0, lineHeight: 1.05, letterSpacing: '-0.5px' }}>
+                                <h1 style={{ fontSize: '28pt', fontWeight: '800', color: '#111', margin: '0 0 10px 0', lineHeight: 1.05, letterSpacing: '-0.5px' }}>
                                     {personalInfo.name || ' '}
                                 </h1>
                                 {personalInfo.title && (
@@ -177,7 +146,7 @@ const RightSidebarTemplate = ({ cvData = {}, profilePicture = null }) => {
                                         {personalInfo.title}
                                     </p>
                                 )}
-                                <div style={{ height: '2px', backgroundColor: BODY_ACCENT, marginTop: '16px' }} />
+                                <div style={{ height: '2px', backgroundColor: BODY_ACCENT, marginTop: '20px' }} />
 
                                 {/* Summary */}
                                 {summary && (
@@ -216,10 +185,32 @@ const RightSidebarTemplate = ({ cvData = {}, profilePicture = null }) => {
                                         ))}
                                     </>
                                 )}
+
+                                {workReferences.length > 0 && (
+                                    <>
+                                        <MainHead>Referencias Laborales</MainHead>
+                                        {workReferences.map((reference, i) => (
+                                            <p className="cv-print-entry" key={`work-${i}`} style={{ fontSize: '8.9pt', color: '#555', lineHeight: '1.65', margin: '0 0 10px' }}>
+                                                {formatReferenceLine(reference)}
+                                            </p>
+                                        ))}
+                                    </>
+                                )}
+
+                                {personalReferences.length > 0 && (
+                                    <>
+                                        <MainHead>Referencias Personales</MainHead>
+                                        {personalReferences.map((reference, i) => (
+                                            <p className="cv-print-entry" key={`personal-${i}`} style={{ fontSize: '8.9pt', color: '#555', lineHeight: '1.65', margin: '0 0 10px' }}>
+                                                {formatReferenceLine(reference)}
+                                            </p>
+                                        ))}
+                                    </>
+                                )}
                             </div>
 
                             {/* ── Right sidebar ── */}
-                            <div style={{ width: `${SIDEBAR_W}px`, flexShrink: 0, backgroundColor: SIDEBAR_BG, padding: '32px 22px 48px', color: '#E2E8F0' }}>
+                            <div style={{ width: `${SIDEBAR_W}px`, flexShrink: 0, padding: '32px 22px 48px', color: '#E2E8F0' }}>
                                 {/* Photo */}
                                 {includePhoto && profilePicture ? (
                                     <div style={{ textAlign: 'center', marginBottom: '20px' }}>

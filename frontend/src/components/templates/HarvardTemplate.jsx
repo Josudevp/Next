@@ -1,9 +1,8 @@
 import { useRef, useState, useEffect } from 'react';
 import { Download, Loader2, FileText } from 'lucide-react';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { openCvPrint, sortByDateDesc, normalizeReferenceGroups, formatReferenceLine } from '../../utils/pdfUtils';
 
-// ── Sub-components (inline styles para que html2canvas los capture fielmente) ──
+// ── Sub-components ────────────────────────────────────────────────────────────
 
 // Letter (8.5 × 11 in) at 96 dpi ≈ 816 × 1056 px
 const LETTER_PX_W = 816;
@@ -18,7 +17,7 @@ const SectionHeading = ({ children }) => (
 );
 
 const EntryBlock = ({ title, subtitle, dates, description, isProject }) => (
-    <div style={{ marginBottom: '16px' }}>
+    <div className="cv-print-entry" style={{ marginBottom: '16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' }}>
             <span style={{ fontSize: '10.5pt', fontWeight: '700', color: '#111', flex: 1 }}>
                 {title}
@@ -53,7 +52,7 @@ const EntryBlock = ({ title, subtitle, dates, description, isProject }) => (
 
 // ── Main Component ──────────────────────────────────────────────────────────
 
-const HarvardTemplate = ({ cvData = {}, profilePicture = null }) => {
+const HarvardTemplate = ({ cvData = {}, profilePicture = null, onFirstExport }) => {
     const cvRef = useRef(null);
     const scrollRef = useRef(null);
     const [isDownloading, setIsDownloading] = useState(false);
@@ -84,16 +83,19 @@ const HarvardTemplate = ({ cvData = {}, profilePicture = null }) => {
     const {
         personalInfo = {},
         summary,
-        education = [],
-        experience = [],
+        education: rawEdu = [],
+        experience: rawExp = [],
         skills = {},
         languages = [],
         includePhoto,
     } = cvData;
+    const experience = sortByDateDesc(rawExp);
+    const education  = sortByDateDesc(rawEdu);
 
     const techSkills = Array.isArray(skills?.technical) ? skills.technical : [];
     const softSkills = Array.isArray(skills?.soft) ? skills.soft : [];
     const allSkills = [...new Set([...techSkills, ...softSkills])].filter(Boolean);
+    const { workReferences, personalReferences } = normalizeReferenceGroups(cvData);
 
     const validLangs = Array.isArray(languages)
         ? languages.filter(l => l && (l.language || typeof l === 'string'))
@@ -110,108 +112,19 @@ const HarvardTemplate = ({ cvData = {}, profilePicture = null }) => {
         personalInfo.address,
     ].filter(Boolean).join('   ·   ');
 
-    const handleDownloadPDF = async () => {
+    const handleDownloadPDF = () => {
         if (!cvRef.current || !hasData) return;
         setIsDownloading(true);
-        let exportHost = null;
-        try {
-            const el = cvRef.current;
-
-            // Render from an offscreen clone so the exported PDF never depends
-            // on the scaled preview state used by the split-screen UI.
-            exportHost = document.createElement('div');
-            exportHost.style.position = 'fixed';
-            exportHost.style.left = '-10000px';
-            exportHost.style.top = '0';
-            exportHost.style.width = `${LETTER_PX_W}px`;
-            exportHost.style.background = '#ffffff';
-            exportHost.style.padding = '0';
-            exportHost.style.margin = '0';
-            exportHost.style.overflow = 'visible';
-            exportHost.style.zIndex = '-1';
-
-            const clone = el.cloneNode(true);
-            clone.style.transform = 'none';
-            clone.style.transformOrigin = 'top left';
-            clone.style.width = `${LETTER_PX_W}px`;
-            clone.style.margin = '0';
-            clone.style.boxShadow = 'none';
-
-            exportHost.appendChild(clone);
-            document.body.appendChild(exportHost);
-
-            if (document.fonts?.ready) {
-                await document.fonts.ready;
-            }
-
-            const canvas = await html2canvas(clone, {
-                scale: 2,
-                useCORS: true,
-                allowTaint: true,
-                backgroundColor: '#ffffff',
-                logging: false,
-                width: LETTER_PX_W,
-                windowWidth: LETTER_PX_W,
-                scrollX: 0,
-                scrollY: 0,
-                x: 0,
-                y: 0,
-            });
-
-            document.body.removeChild(exportHost);
-            exportHost = null;
-
-            if (!canvas.width || !canvas.height) {
-                throw new Error('Canvas exportado sin dimensiones válidas.');
-            }
-
-            const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
-            const pdfW = pdf.internal.pageSize.getWidth();
-            const pdfH = pdf.internal.pageSize.getHeight();
-            const imgData = canvas.toDataURL('image/png');
-            const marginMm = 10;
-            const maxW = pdfW - marginMm * 2;
-            const maxH = pdfH - marginMm * 2;
-            const aspect = canvas.width / canvas.height;
-
-            if (!Number.isFinite(aspect) || aspect <= 0) {
-                throw new Error('Dimensiones inválidas del canvas para el PDF.');
-            }
-
-            let renderW = maxW;
-            let renderH = renderW / aspect;
-            if (renderH > maxH) {
-                renderH = maxH;
-                renderW = renderH * aspect;
-            }
-
-            if (!Number.isFinite(renderW) || !Number.isFinite(renderH) || renderW <= 0 || renderH <= 0) {
-                throw new Error('Dimensiones inválidas al ajustar el PDF a A4.');
-            }
-
-            const offsetX = (pdfW - renderW) / 2;
-            const offsetY = marginMm;
-            pdf.addImage(imgData, 'PNG', offsetX, offsetY, renderW, renderH, undefined, 'FAST');
-
-            const safeName = (personalInfo.name || 'MiCV')
-                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-                .replace(/[^a-zA-Z0-9\s]/g, '').trim()
-                .replace(/\s+/g, '_');
-            pdf.save(`CV_${safeName}.pdf`);
-        } catch (err) {
-            console.error('[HarvardTemplate] Error generando PDF:', err);
-        } finally {
-            if (exportHost?.parentNode) {
-                exportHost.parentNode.removeChild(exportHost);
-            }
+        openCvPrint(() => {
             setIsDownloading(false);
-        }
+            onFirstExport?.();
+        });
     };
 
     return (
-        <div className="flex flex-col h-full bg-white">
+        <div className="cv-print-shell flex h-full min-h-0 flex-col bg-white">
             {/* ── Header con botón de descarga ── */}
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 flex-shrink-0">
+            <div className="cv-print-toolbar flex items-center justify-between px-4 py-2.5 border-b border-gray-100 flex-shrink-0">
                 <div>
                     <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Vista Previa · Harvard</p>
                     {hasData && personalInfo.name && (
@@ -229,7 +142,7 @@ const HarvardTemplate = ({ cvData = {}, profilePicture = null }) => {
             </div>
 
             {/* ── Área de scroll con la hoja A4 ── */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden bg-gray-100 p-4 flex flex-col items-center">
+            <div ref={scrollRef} className="cv-print-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-gray-100 p-4 flex flex-col items-center">
                 {!hasData ? (
                     <div className="flex flex-col items-center justify-center h-full text-center gap-3 py-16">
                         <div className="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center">
@@ -242,14 +155,15 @@ const HarvardTemplate = ({ cvData = {}, profilePicture = null }) => {
                     </div>
                 ) : (
                     /* ── Wrapper que reserva el espacio correcto al aplicar scale ── */
-                    <div style={{
+                    <div className="cv-print-scale-box" style={{
                         width: `${LETTER_PX_W * scale}px`,
                         height: `${cvNaturalH * scale}px`,
                         margin: 'auto',
                         overflow: 'hidden',
                     }}>
-                    {/* ── Hoja A4 (capturada por html2canvas a tamaño natural) ── */}
+                    {/* ── Hoja lista para vista previa e impresión nativa ── */}
                     <div
+                        className="cv-print-document"
                         ref={cvRef}
                         id="cv-a4-preview"
                         style={{
@@ -323,7 +237,7 @@ const HarvardTemplate = ({ cvData = {}, profilePicture = null }) => {
                         {experience.length > 0 && (
                             <>
                                 <SectionHeading>EXPERIENCIA LABORAL</SectionHeading>
-                                <div style={{ marginTop: '8px' }}>
+                                <div className="cv-print-section" style={{ marginTop: '8px' }}>
                                     {experience.map((ex, i) => (
                                         <EntryBlock
                                             key={i}
@@ -342,7 +256,7 @@ const HarvardTemplate = ({ cvData = {}, profilePicture = null }) => {
                         {education.length > 0 && (
                             <>
                                 <SectionHeading>EDUCACIÓN</SectionHeading>
-                                <div style={{ marginTop: '8px' }}>
+                                <div className="cv-print-section" style={{ marginTop: '8px' }}>
                                     {education.map((ed, i) => (
                                         <EntryBlock
                                             key={i}
@@ -375,6 +289,32 @@ const HarvardTemplate = ({ cvData = {}, profilePicture = null }) => {
                                         .map(l => typeof l === 'string' ? l : [l.language, l.level].filter(Boolean).join(' — '))
                                         .join('   ·   ')}
                                 </p>
+                            </>
+                        )}
+
+                        {workReferences.length > 0 && (
+                            <>
+                                <SectionHeading>REFERENCIAS LABORALES</SectionHeading>
+                                <div style={{ marginTop: '8px' }}>
+                                    {workReferences.map((reference, i) => (
+                                        <p className="cv-print-entry" key={`work-${i}`} style={{ fontSize: '10pt', color: '#333', lineHeight: '1.7', margin: '0 0 8px' }}>
+                                            {formatReferenceLine(reference)}
+                                        </p>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+
+                        {personalReferences.length > 0 && (
+                            <>
+                                <SectionHeading>REFERENCIAS PERSONALES</SectionHeading>
+                                <div style={{ marginTop: '8px' }}>
+                                    {personalReferences.map((reference, i) => (
+                                        <p className="cv-print-entry" key={`personal-${i}`} style={{ fontSize: '10pt', color: '#333', lineHeight: '1.7', margin: '0 0 8px' }}>
+                                            {formatReferenceLine(reference)}
+                                        </p>
+                                    ))}
+                                </div>
                             </>
                         )}
                     </div>

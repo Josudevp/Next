@@ -1,7 +1,6 @@
 import { useRef, useState, useEffect } from 'react';
 import { Download, Loader2, FileText } from 'lucide-react';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import { openCvPrint, sortByDateDesc, normalizeReferenceGroups, formatReferenceLine } from '../../utils/pdfUtils';
 
 const LETTER_PX_W = 816;
 const LETTER_PX_H = 1056;
@@ -19,7 +18,7 @@ const SectionHead = ({ children }) => (
 );
 
 // ── Main Component ────────────────────────────────────────────────────────────
-const TechTemplate = ({ cvData = {}, profilePicture = null }) => {
+const TechTemplate = ({ cvData = {}, profilePicture = null, onFirstExport }) => {
     const cvRef    = useRef(null);
     const scrollRef = useRef(null);
     const [isDownloading, setIsDownloading] = useState(false);
@@ -41,12 +40,15 @@ const TechTemplate = ({ cvData = {}, profilePicture = null }) => {
         return () => ro.disconnect();
     }, []);
 
-    const { personalInfo = {}, summary, education = [], experience = [],
+    const { personalInfo = {}, summary, education: rawEdu = [], experience: rawExp = [],
             skills = {}, languages = [], includePhoto } = cvData;
+    const experience = sortByDateDesc(rawExp);
+    const education  = sortByDateDesc(rawEdu);
 
     const techSkills = Array.isArray(skills?.technical) ? skills.technical : [];
     const softSkills = Array.isArray(skills?.soft)      ? skills.soft      : [];
     const allSkills  = [...new Set([...techSkills, ...softSkills])].filter(Boolean);
+    const { workReferences, personalReferences } = normalizeReferenceGroups(cvData);
     const validLangs = Array.isArray(languages)
         ? languages.filter(l => l && (l.language || typeof l === 'string')) : [];
     const hasData = !!(personalInfo.name || summary || education.length || experience.length);
@@ -60,78 +62,20 @@ const TechTemplate = ({ cvData = {}, profilePicture = null }) => {
         personalInfo.address,
     ].filter(Boolean);
 
-    // ── PDF Export ────────────────────────────────────────────────────────────
-    const handleDownloadPDF = async () => {
+    // ── Native browser print ──────────────────────────────────────────────────
+    const handleDownloadPDF = () => {
         if (!cvRef.current || !hasData) return;
         setIsDownloading(true);
-        let exportHost = null;
-        try {
-            exportHost = document.createElement('div');
-            exportHost.style.cssText = `position:fixed;left:-10000px;top:0;width:${LETTER_PX_W}px;background:#fff;padding:0;margin:0;overflow:visible;z-index:-1`;
-            const clone = cvRef.current.cloneNode(true);
-            clone.style.transform = 'none';
-            clone.style.width     = `${LETTER_PX_W}px`;
-            clone.style.margin    = '0';
-            clone.style.boxShadow = 'none';
-            exportHost.appendChild(clone);
-            document.body.appendChild(exportHost);
-            if (document.fonts?.ready) await document.fonts.ready;
-            // Small delay so browser paints custom fonts before html2canvas captures
-            await new Promise(r => setTimeout(r, 150));
-            const canvas = await html2canvas(clone, {
-                scale: 2, useCORS: true, allowTaint: true,
-                backgroundColor: '#ffffff', logging: false,
-                width: LETTER_PX_W, windowWidth: LETTER_PX_W,
-                scrollX: 0, scrollY: 0, x: 0, y: 0,
-                onclone: (clonedDoc) => {
-                    // Replace ALL custom/web fonts with Arial throughout the entire clone.
-                    // html2canvas has accurate metrics only for standard system fonts.
-                    // Using Arial everywhere ensures height/lineHeight centering is pixel-perfect.
-                    const style = clonedDoc.createElement('style');
-                    style.textContent = `
-                        * {
-                            font-family: Arial, Helvetica, sans-serif !important;
-                            font-variant-ligatures: none !important;
-                        }
-                        [data-pdf-badge] {
-                            display: inline-block !important;
-                            height: 24px !important;
-                            line-height: 24px !important;
-                            padding: 0 10px !important;
-                            vertical-align: middle !important;
-                            text-align: center !important;
-                            white-space: nowrap !important;
-                        }
-                    `;
-                    clonedDoc.head.appendChild(style);
-                },
-            });
-            document.body.removeChild(exportHost);
-            exportHost = null;
-            if (!canvas.width || !canvas.height) throw new Error('Canvas vacío');
-            const pdf  = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'letter' });
-            const pdfW = pdf.internal.pageSize.getWidth();
-            const pdfH = pdf.internal.pageSize.getHeight();
-            const asp  = canvas.width / canvas.height;
-            let rW = pdfW, rH = rW / asp;
-            if (rH > pdfH) { rH = pdfH; rW = rH * asp; }
-            pdf.addImage(canvas.toDataURL('image/png'), 'PNG', (pdfW - rW) / 2, 0, rW, rH, undefined, 'FAST');
-            const safe = (personalInfo.name || 'MiCV')
-                .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-                .replace(/[^a-zA-Z0-9\s]/g, '').trim().replace(/\s+/g, '_');
-            pdf.save(`CV_${safe}.pdf`);
-        } catch (err) {
-            console.error('[TechTemplate] PDF error:', err);
-        } finally {
-            if (exportHost?.parentNode) exportHost.parentNode.removeChild(exportHost);
+        openCvPrint(() => {
             setIsDownloading(false);
-        }
+            onFirstExport?.();
+        });
     };
 
     return (
-        <div className="flex flex-col h-full bg-white">
+        <div className="cv-print-shell flex h-full min-h-0 flex-col bg-white">
             {/* ── Header bar ── */}
-            <div className="flex items-center justify-between px-4 py-2.5 border-b border-gray-100 shrink-0">
+            <div className="cv-print-toolbar flex items-center justify-between px-4 py-2.5 border-b border-gray-100 shrink-0">
                 <div>
                     <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest">Vista Previa · Tech Dev</p>
                     {hasData && personalInfo.name && (
@@ -149,7 +93,7 @@ const TechTemplate = ({ cvData = {}, profilePicture = null }) => {
             </div>
 
             {/* ── Scroll area ── */}
-            <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden bg-gray-100 p-4 flex flex-col items-center">
+            <div ref={scrollRef} className="cv-print-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-gray-100 p-4 flex flex-col items-center">
                 {!hasData ? (
                     <div className="flex flex-col items-center justify-center h-full text-center gap-3 py-16">
                         <div className="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center">
@@ -161,19 +105,20 @@ const TechTemplate = ({ cvData = {}, profilePicture = null }) => {
                         </p>
                     </div>
                 ) : (
-                    <div style={{ width: `${LETTER_PX_W * scale}px`, height: `${cvNaturalH * scale}px`, margin: 'auto', overflow: 'hidden' }}>
+                    <div className="cv-print-scale-box" style={{ width: `${LETTER_PX_W * scale}px`, height: `${cvNaturalH * scale}px`, margin: 'auto', overflow: 'hidden' }}>
                         <div
+                            className="cv-print-document"
                             ref={cvRef}
                             style={{
                                 width: `${LETTER_PX_W}px`, minHeight: `${LETTER_PX_H}px`,
-                                display: 'flex', backgroundColor: '#ffffff',
+                                display: 'flex', background: `linear-gradient(to right, ${ACCENT} 5px, #ffffff 5px)`,
                                 boxShadow: '0 2px 20px rgba(0,0,0,0.14)',
                                 fontFamily: SANS, color: '#1a1a1a',
                                 transformOrigin: 'top left', transform: `scale(${scale})`,
                             }}
                         >
                             {/* Left green accent bar */}
-                            <div style={{ width: '5px', backgroundColor: ACCENT, flexShrink: 0 }} />
+                            <div style={{ width: '5px', flexShrink: 0 }} />
 
                             {/* Content */}
                             <div style={{ flex: 1, padding: '32px 80px 44px 62px' }}
@@ -231,9 +176,9 @@ const TechTemplate = ({ cvData = {}, profilePicture = null }) => {
                                 {experience.length > 0 && (
                                     <>
                                         <SectionHead>Experiencia Laboral</SectionHead>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                                        <div className="cv-print-section" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                                             {experience.map((ex, i) => (
-                                                <div key={i} style={{ paddingLeft: '14px', borderLeft: '2px solid #D1FAE5' }}>
+                                                <div className="cv-print-entry" key={i} style={{ paddingLeft: '14px', borderLeft: '2px solid #D1FAE5' }}>
                                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' }}>
                                                         <span style={{ fontSize: '10.5pt', fontWeight: '700', color: '#111', flex: 1 }}>
                                                             {ex.position || ex.title || ''}
@@ -255,9 +200,9 @@ const TechTemplate = ({ cvData = {}, profilePicture = null }) => {
                                 {education.length > 0 && (
                                     <>
                                         <SectionHead>Educación</SectionHead>
-                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                                        <div className="cv-print-section" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                                             {education.map((ed, i) => (
-                                                <div key={i} style={{ paddingLeft: '14px', borderLeft: '2px solid #D1FAE5' }}>
+                                                <div className="cv-print-entry" key={i} style={{ paddingLeft: '14px', borderLeft: '2px solid #D1FAE5' }}>
                                                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: '8px' }}>
                                                         <span style={{ fontSize: '10.5pt', fontWeight: '700', color: '#111', flex: 1 }}>{ed.degree || ''}</span>
                                                         {ed.dates && <span style={{ fontFamily: MONO, fontSize: '8pt', color: '#888', flexShrink: 0 }}>{ed.dates}</span>}
@@ -277,6 +222,32 @@ const TechTemplate = ({ cvData = {}, profilePicture = null }) => {
                                         <p style={{ fontSize: '9.5pt', color: '#444', lineHeight: 1.7 }}>
                                             {validLangs.map(l => typeof l === 'string' ? l : [l.language, l.level].filter(Boolean).join(' — ')).join('   ·   ')}
                                         </p>
+                                    </>
+                                )}
+
+                                {workReferences.length > 0 && (
+                                    <>
+                                        <SectionHead>Referencias Laborales</SectionHead>
+                                        <div className="cv-print-section" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                            {workReferences.map((reference, i) => (
+                                                <p className="cv-print-entry" key={`work-${i}`} style={{ fontSize: '9pt', color: '#444', lineHeight: 1.7, margin: 0, fontFamily: MONO }}>
+                                                    {formatReferenceLine(reference)}
+                                                </p>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+
+                                {personalReferences.length > 0 && (
+                                    <>
+                                        <SectionHead>Referencias Personales</SectionHead>
+                                        <div className="cv-print-section" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                            {personalReferences.map((reference, i) => (
+                                                <p className="cv-print-entry" key={`personal-${i}`} style={{ fontSize: '9pt', color: '#444', lineHeight: 1.7, margin: 0, fontFamily: MONO }}>
+                                                    {formatReferenceLine(reference)}
+                                                </p>
+                                            ))}
+                                        </div>
                                     </>
                                 )}
 

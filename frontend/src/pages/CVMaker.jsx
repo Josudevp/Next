@@ -7,13 +7,13 @@ const TEMPLATES = [
   {
     id: 'andrea',
     name: 'Andrea',
-    style: 'Rosa Elegante',
-    description: 'Diseño creativo con barra lateral rosa y foto circular. Ideal para diseño y artes.',
-    accent: '#E8908A',
-    bg: '#FDF0EE',
+    style: 'Blue Creative',
+    description: 'Diseño creativo en azul petróleo con contraste limpio y foto circular. Ideal para diseño y branding.',
+    accent: '#2596BE',
+    bg: '#E9F6FB',
     layout: 'sidebar',
     badge: 'Creativo',
-    badgeColor: 'bg-rose-100 text-rose-700',
+    badgeColor: 'bg-cyan-100 text-cyan-700',
   },
   {
     id: 'elena',
