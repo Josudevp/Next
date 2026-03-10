@@ -34,29 +34,16 @@ export default defineConfig({
       output: {
         // Stable vendor chunk names → aggressive browser caching between deploys
         manualChunks: (id) => {
-          if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
-            return 'vendor-react';
-          }
           // Spline 3D — very heavy (~2 MB), isolated so it never blocks other chunks
           if (id.includes('@splinetool')) {
             return 'vendor-spline';
-          }
-          if (id.includes('react-router')) {
-            return 'vendor-router';
-          }
-          if (id.includes('lucide-react')) {
-            return 'vendor-lucide';
-          }
-          // react-markdown + its remark/rehype deps
-          if (id.includes('react-markdown') || id.includes('remark') || id.includes('rehype') || id.includes('unified')) {
-            return 'vendor-markdown';
           }
           // pdf libs — only loaded on CV page
           if (id.includes('jspdf') || id.includes('html2canvas')) {
             return 'vendor-pdf';
           }
           if (id.includes('node_modules')) {
-            return 'vendor-misc';
+            return 'vendor';
           }
         },
         chunkFileNames: 'assets/js/[name]-[hash].js',
