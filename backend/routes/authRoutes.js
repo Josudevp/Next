@@ -1,5 +1,5 @@
 import express from 'express';
-import { register, login, forgotPassword, resetPassword } from '../controllers/authController.js';
+import { register, login, forgotPassword, resetPassword, googleLogin } from '../controllers/authController.js';
 
 const router = express.Router();
 
@@ -8,6 +8,9 @@ router.post('/register', register);
 
 // Ruta: POST /api/auth/login
 router.post('/login', login);
+
+// Ruta: POST /api/auth/google
+router.post('/google', googleLogin);
 
 // Ruta: POST /api/auth/forgot-password
 router.post('/forgot-password', forgotPassword);

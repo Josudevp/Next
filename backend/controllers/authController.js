@@ -202,6 +202,81 @@ export const forgotPassword = async (req, res) => {
 };
 
 // ----------------------------------------------------
+// FUNCION 5: LOGIN CON GOOGLE (Social Auth)
+// ----------------------------------------------------
+const fetchGoogleUser = async ({ credential, accessToken }) => {
+  if (credential) {
+    // ID-token flow: verify signature + claims via tokeninfo
+    const url = `https://oauth2.googleapis.com/tokeninfo?id_token=${encodeURIComponent(credential)}`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error('ID token de Google inválido');
+    const payload = await res.json();
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (clientId && payload.aud !== clientId) throw new Error('Token no emitido para esta aplicación');
+    return payload;
+  }
+  if (accessToken) {
+    // Access-token flow: fetch userinfo
+    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+    if (!res.ok) throw new Error('Access token de Google inválido');
+    return res.json();
+  }
+  throw new Error('Token de Google requerido');
+};
+
+export const googleLogin = async (req, res) => {
+  try {
+    const { credential, accessToken } = req.body;
+    if (!credential && !accessToken) {
+      return res.status(400).json({ mensaje: 'Token de Google requerido' });
+    }
+
+    const googleUser = await fetchGoogleUser({ credential, accessToken });
+
+    if (googleUser.email_verified !== true && googleUser.email_verified !== 'true') {
+      return res.status(400).json({ mensaje: 'El correo de Google no está verificado' });
+    }
+
+    const email = googleUser.email?.toLowerCase().trim();
+    if (!email) return res.status(400).json({ mensaje: 'No se pudo obtener el correo de Google' });
+
+    let user = await User.findOne({ where: { email } });
+    const isNewUser = !user;
+
+    if (!user) {
+      user = await User.create({
+        name: googleUser.name || email.split('@')[0],
+        email,
+        password: null,
+        googleId: googleUser.sub,
+        profilePicture: googleUser.picture || null,
+      });
+    } else if (!user.googleId) {
+      user.googleId = googleUser.sub;
+      if (!user.profilePicture && googleUser.picture) {
+        user.profilePicture = googleUser.picture;
+      }
+      await user.save();
+    }
+
+    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '1d' });
+
+    return res.json({
+      mensaje: 'Login con Google exitoso',
+      token,
+      user: { name: user.name, email: user.email },
+      isNewUser,
+      needsOnboarding: !user.area,
+    });
+  } catch (error) {
+    console.error('[googleLogin] Error:', error.message);
+    return res.status(401).json({ mensaje: 'No se pudo autenticar con Google. Intenta de nuevo.' });
+  }
+};
+
+// ----------------------------------------------------
 // FUNCION 4: RESTABLECER CONTRASEÑA
 // ----------------------------------------------------
 export const resetPassword = async (req, res) => {
