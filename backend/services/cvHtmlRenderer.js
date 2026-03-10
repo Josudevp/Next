@@ -28,10 +28,9 @@ function normalizeRef(e) {
     if (typeof e === 'string') return e.trim() ? { name: e.trim() } : null;
     const n = {
         name: e.name || '',
-        relation: e.relation || e.role || '',
-        company: e.company || '',
+        // Support both new schema (position) and legacy data (relation / role)
+        position: e.position || e.relation || e.role || '',
         phone: e.phone || '',
-        email: e.email || '',
     };
     return Object.values(n).some(Boolean) ? n : null;
 }
@@ -41,14 +40,14 @@ function getRefs(cv) {
     return {
         workRefs: norm(cv.workReferences || cv.references?.work),
         personalRefs: norm(cv.personalReferences || cv.references?.personal),
+        familyRefs: norm(cv.familyReferences || cv.references?.family),
     };
 }
 
 function fmtRef(r) {
     if (!r) return '';
-    const main = [r.name, [r.relation, r.company].filter(Boolean).join(' · ')].filter(Boolean).join(' — ');
-    const contact = [r.phone, r.email].filter(Boolean).join(' · ');
-    return [main, contact].filter(Boolean).join(' · ');
+    const main = [r.name, r.position].filter(Boolean).join(' — ');
+    return [main, r.phone].filter(Boolean).join(' · ');
 }
 
 function getSkills(skills) {
@@ -113,7 +112,7 @@ function renderHarvard(cv, photo) {
     const exp = sortByDate(rawExp);
     const edu = sortByDate(rawEdu);
     const allSkills = getSkills(skills);
-    const { workRefs, personalRefs } = getRefs(cv);
+    const { workRefs, personalRefs, familyRefs } = getRefs(cv);
     const langs = getLangs(languages);
 
     const contactLine = [
@@ -162,6 +161,7 @@ function renderHarvard(cv, photo) {
     ${langs.length ? `${secHead('IDIOMAS')}<p style="font-size:10.5pt;color:#333;line-height:1.7;margin:8px 0 0">${esc(langs.map(langStr).join('   ·   '))}</p>` : ''}
     ${workRefs.length ? `${secHead('REFERENCIAS LABORALES')}<div style="margin-top:8px">${refLines(workRefs)}</div>` : ''}
     ${personalRefs.length ? `${secHead('REFERENCIAS PERSONALES')}<div style="margin-top:8px">${refLines(personalRefs)}</div>` : ''}
+    ${familyRefs.length ? `${secHead('REFERENCIAS FAMILIARES')}<div style="margin-top:8px">${refLines(familyRefs)}</div>` : ''}
 </div>`);
 }
 
@@ -177,7 +177,7 @@ function renderModernBlue(cv, photo) {
     const exp = sortByDate(rawExp);
     const edu = sortByDate(rawEdu);
     const allSkills = getSkills(skills);
-    const { workRefs, personalRefs } = getRefs(cv);
+    const { workRefs, personalRefs, familyRefs } = getRefs(cv);
     const langs = getLangs(languages);
     const SIDEBAR_W = 272;
 
@@ -249,6 +249,7 @@ function renderModernBlue(cv, photo) {
         ${edu.length ? `${bodyHead('Educación')}<div style="display:flex;flex-direction:column;gap:14px">${edu.map(eduEntry).join('')}</div>` : ''}
         ${workRefs.length ? `${bodyHead('Referencias Laborales')}<div style="display:flex;flex-direction:column;gap:10px">${workRefs.map(r => `<p style="font-size:9.3pt;color:#555;line-height:1.65;margin:0">${esc(fmtRef(r))}</p>`).join('')}</div>` : ''}
         ${personalRefs.length ? `${bodyHead('Referencias Personales')}<div style="display:flex;flex-direction:column;gap:10px">${personalRefs.map(r => `<p style="font-size:9.3pt;color:#555;line-height:1.65;margin:0">${esc(fmtRef(r))}</p>`).join('')}</div>` : ''}
+        ${familyRefs.length ? `${bodyHead('Referencias Familiares')}<div style="display:flex;flex-direction:column;gap:10px">${familyRefs.map(r => `<p style="font-size:9.3pt;color:#555;line-height:1.65;margin:0">${esc(fmtRef(r))}</p>`).join('')}</div>` : ''}
     </div>
 </div>`);
 }
@@ -265,7 +266,7 @@ function renderTech(cv, photo) {
     const exp = sortByDate(rawExp);
     const edu = sortByDate(rawEdu);
     const allSkills = getSkills(skills);
-    const { workRefs, personalRefs } = getRefs(cv);
+    const { workRefs, personalRefs, familyRefs } = getRefs(cv);
     const langs = getLangs(languages);
 
     const ACCENT = '#16A34A';
@@ -330,6 +331,7 @@ function renderTech(cv, photo) {
         ${langs.length ? `${secHead('Idiomas')}<p style="font-size:9.5pt;color:#444;line-height:1.7">${esc(langs.map(langStr).join('   ·   '))}</p>` : ''}
         ${workRefs.length ? `${secHead('Referencias Laborales')}<div style="display:flex;flex-direction:column;gap:8px">${workRefs.map(r => `<p style="font-size:9pt;color:#444;line-height:1.7;margin:0;font-family:${MONO}">${esc(fmtRef(r))}</p>`).join('')}</div>` : ''}
         ${personalRefs.length ? `${secHead('Referencias Personales')}<div style="display:flex;flex-direction:column;gap:8px">${personalRefs.map(r => `<p style="font-size:9pt;color:#444;line-height:1.7;margin:0;font-family:${MONO}">${esc(fmtRef(r))}</p>`).join('')}</div>` : ''}
+        ${familyRefs.length ? `${secHead('Referencias Familiares')}<div style="display:flex;flex-direction:column;gap:8px">${familyRefs.map(r => `<p style="font-size:9pt;color:#444;line-height:1.7;margin:0;font-family:${MONO}">${esc(fmtRef(r))}</p>`).join('')}</div>` : ''}
     </div>
 </div>`);
 }
@@ -346,7 +348,7 @@ function renderExecutive(cv, photo) {
     const exp = sortByDate(rawExp);
     const edu = sortByDate(rawEdu);
     const allSkills = getSkills(skills);
-    const { workRefs, personalRefs } = getRefs(cv);
+    const { workRefs, personalRefs, familyRefs } = getRefs(cv);
     const langs = getLangs(languages);
 
     const ACCENT = '#1E5F5F';
@@ -401,6 +403,7 @@ function renderExecutive(cv, photo) {
         ${langs.length ? `${secHead('Idiomas')}<p style="font-family:${SERIF};font-size:9.5pt;color:#444;line-height:1.8;text-align:center">${esc(langs.map(langStr).join('   ·   '))}</p>` : ''}
         ${workRefs.length ? `${secHead('Referencias Laborales')}${workRefs.map(r => `<p style="font-family:${SERIF};font-size:9.3pt;color:#444;line-height:1.8;text-align:center;margin:0 0 6px">${esc(fmtRef(r))}</p>`).join('')}` : ''}
         ${personalRefs.length ? `${secHead('Referencias Personales')}${personalRefs.map(r => `<p style="font-family:${SERIF};font-size:9.3pt;color:#444;line-height:1.8;text-align:center;margin:0 0 6px">${esc(fmtRef(r))}</p>`).join('')}` : ''}
+        ${familyRefs.length ? `${secHead('Referencias Familiares')}${familyRefs.map(r => `<p style="font-family:${SERIF};font-size:9.3pt;color:#444;line-height:1.8;text-align:center;margin:0 0 6px">${esc(fmtRef(r))}</p>`).join('')}` : ''}
         <div style="height:3px;background:${ACCENT};opacity:0.4;margin-top:36px"></div>
     </div>
 </div>`);
@@ -418,7 +421,7 @@ function renderCreative(cv, photo) {
     const exp = sortByDate(rawExp);
     const edu = sortByDate(rawEdu);
     const allSkills = getSkills(skills);
-    const { workRefs, personalRefs } = getRefs(cv);
+    const { workRefs, personalRefs, familyRefs } = getRefs(cv);
     const langs = getLangs(languages);
 
     const ACCENT = '#2596BE';
@@ -446,8 +449,8 @@ function renderCreative(cv, photo) {
     const refEntry = (r) =>
         `<div style="margin-bottom:10px">
             <p style="font-size:8.8pt;color:#111;font-weight:700;margin:0">${esc(r.name || 'Referencia')}</p>
-            ${r.relation || r.company ? `<p style="font-size:8.2pt;color:${DARK_ACCENT};margin:2px 0 3px;font-weight:600">${esc([r.relation, r.company].filter(Boolean).join(' · '))}</p>` : ''}
-            ${r.phone || r.email ? `<p style="font-size:8.2pt;color:#555;margin:0;line-height:1.55">${esc([r.phone, r.email].filter(Boolean).join(' · '))}</p>` : ''}
+            ${r.position ? `<p style="font-size:8.2pt;color:${DARK_ACCENT};margin:2px 0 3px;font-weight:600">${esc(r.position)}</p>` : ''}
+            ${r.phone ? `<p style="font-size:8.2pt;color:#555;margin:0;line-height:1.55">${esc(r.phone)}</p>` : ''}
         </div>`;
 
     const photoHtml = includePhoto && photo
@@ -477,6 +480,7 @@ function renderCreative(cv, photo) {
             ${langs.length ? `<div>${colHead('Idiomas')}<div style="display:flex;flex-direction:column;gap:4px">${langs.map(l => `<p style="font-size:8.5pt;color:#444;margin:0;line-height:1.6">${esc(langStr(l))}</p>`).join('')}</div></div>` : ''}
             ${workRefs.length ? `<div style="margin-top:22px">${colHead('Referencias Laborales')}${workRefs.map(refEntry).join('')}</div>` : ''}
             ${personalRefs.length ? `<div style="margin-top:22px">${colHead('Referencias Personales')}${personalRefs.map(refEntry).join('')}</div>` : ''}
+            ${familyRefs.length ? `<div style="margin-top:22px">${colHead('Referencias Familiares')}${familyRefs.map(refEntry).join('')}</div>` : ''}
         </div>
     </div>
 </div>`);
@@ -494,7 +498,7 @@ function renderCorporate(cv, photo) {
     const exp = sortByDate(rawExp);
     const edu = sortByDate(rawEdu);
     const allSkills = getSkills(skills);
-    const { workRefs, personalRefs } = getRefs(cv);
+    const { workRefs, personalRefs, familyRefs } = getRefs(cv);
     const langs = getLangs(languages);
 
     const SIDEBAR_BG = '#1E293B';
@@ -541,6 +545,7 @@ function renderCorporate(cv, photo) {
         ${edu.length ? `${mainHead('Educación')}${edu.map(e => mainEntry(e.degree || '', e.institution, e.dates, e.description)).join('')}` : ''}
         ${workRefs.length ? `${mainHead('Referencias Laborales')}${workRefs.map(r => `<p style="font-size:8.9pt;color:#555;line-height:1.65;margin:0 0 10px">${esc(fmtRef(r))}</p>`).join('')}` : ''}
         ${personalRefs.length ? `${mainHead('Referencias Personales')}${personalRefs.map(r => `<p style="font-size:8.9pt;color:#555;line-height:1.65;margin:0 0 10px">${esc(fmtRef(r))}</p>`).join('')}` : ''}
+        ${familyRefs.length ? `${mainHead('Referencias Familiares')}${familyRefs.map(r => `<p style="font-size:8.9pt;color:#555;line-height:1.65;margin:0 0 10px">${esc(fmtRef(r))}</p>`).join('')}` : ''}
     </div>
     <div style="width:${SIDEBAR_W}px;flex-shrink:0;background:${SIDEBAR_BG};padding:32px 22px 48px;color:#E2E8F0">
         ${photoHtml}

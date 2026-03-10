@@ -35,14 +35,14 @@ const ExpEntry = ({ title, subtitle, dates, description }) => (
 const ReferenceEntry = ({ reference }) => (
     <div style={{ marginBottom: '10px' }}>
         <p style={{ fontSize: '8.8pt', color: '#111', fontWeight: '700', margin: 0 }}>{reference.name || 'Referencia'}</p>
-        {(reference.relation || reference.company) && (
+        {reference.position && (
             <p style={{ fontSize: '8.2pt', color: DARK_ACCENT, margin: '2px 0 3px', fontWeight: '600' }}>
-                {[reference.relation, reference.company].filter(Boolean).join(' · ')}
+                {reference.position}
             </p>
         )}
-        {(reference.phone || reference.email) && (
+        {reference.phone && (
             <p style={{ fontSize: '8.2pt', color: '#555', margin: 0, lineHeight: 1.55 }}>
-                {[reference.phone, reference.email].filter(Boolean).join(' · ')}
+                {reference.phone}
             </p>
         )}
     </div>
@@ -79,7 +79,7 @@ const CreativeTemplate = ({ cvData = {}, profilePicture = null, onFirstExport })
     const techSkills = Array.isArray(skills?.technical) ? skills.technical : [];
     const softSkills = Array.isArray(skills?.soft)      ? skills.soft      : [];
     const allSkills  = [...new Set([...techSkills, ...softSkills])].filter(Boolean);
-    const { workReferences, personalReferences } = normalizeReferenceGroups(cvData);
+    const { workReferences, personalReferences, familyReferences } = normalizeReferenceGroups(cvData);
     const validLangs = Array.isArray(languages)
         ? languages.filter(l => l && (l.language || typeof l === 'string')) : [];
     const hasData = !!(personalInfo.name || summary || education.length || experience.length);
@@ -134,7 +134,7 @@ const CreativeTemplate = ({ cvData = {}, profilePicture = null, onFirstExport })
                             <FileText size={24} className="text-gray-300" />
                         </div>
                         <p className="text-sm font-semibold text-gray-400">Tu CV aparecerá aquí</p>
-                        <p className="text-xs text-gray-400 max-w-[165px] leading-relaxed">
+                        <p className="text-xs text-gray-400 max-w-41.25 leading-relaxed">
                             Responde las preguntas y tu CV se irá construyendo en tiempo real
                         </p>
                     </div>
@@ -252,6 +252,14 @@ const CreativeTemplate = ({ cvData = {}, profilePicture = null, onFirstExport })
                                             <ColHead>Referencias Personales</ColHead>
                                             {personalReferences.map((reference, i) => (
                                                 <ReferenceEntry key={`personal-${i}`} reference={reference} />
+                                            ))}
+                                        </div>
+                                    )}
+                                    {familyReferences.length > 0 && (
+                                        <div className="cv-print-section" style={{ marginTop: '22px' }}>
+                                            <ColHead>Referencias Familiares</ColHead>
+                                            {familyReferences.map((reference, i) => (
+                                                <ReferenceEntry key={`family-${i}`} reference={reference} />
                                             ))}
                                         </div>
                                     )}

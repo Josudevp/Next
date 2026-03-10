@@ -119,10 +119,8 @@ function normalizeReferenceEntry(entry) {
 
     const normalized = {
         name: entry.name || '',
-        relation: entry.relation || entry.role || '',
-        company: entry.company || '',
+        position: entry.position || entry.relation || entry.role || '',
         phone: entry.phone || '',
-        email: entry.email || '',
     };
 
     return Object.values(normalized).some(Boolean) ? normalized : null;
@@ -137,16 +135,16 @@ export function normalizeReferenceGroups(cvData = {}) {
     return {
         workReferences: normalizeReferenceGroup(cvData.workReferences || cvData.references?.work),
         personalReferences: normalizeReferenceGroup(cvData.personalReferences || cvData.references?.personal),
+        familyReferences: normalizeReferenceGroup(cvData.familyReferences || cvData.references?.family),
     };
 }
 
 export function formatReferenceLine(reference) {
     if (!reference) return '';
 
-    const main = [reference.name, reference.relation || reference.company].filter(Boolean).join(' — ');
-    const contact = [reference.phone, reference.email].filter(Boolean).join(' · ');
+    const main = [reference.name, reference.position].filter(Boolean).join(' — ');
 
-    return [main, contact].filter(Boolean).join(' · ');
+    return [main, reference.phone].filter(Boolean).join(' · ');
 }
 
 export function openCvPrint(onAfterPrint) {

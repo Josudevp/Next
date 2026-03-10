@@ -3,9 +3,11 @@ dotenv.config();
 
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import sequelize from './config/db.js';
 import './models/User.js';
 import './models/Message.js'; // Registra el modelo y define la asociación User → Message
+import { warmBrowser } from './services/browserPool.js';
 
 // Rutas
 import authRoutes from './routes/authRoutes.js';
@@ -54,6 +56,10 @@ app.use(
   })
 );
 
+// Gzip compression — reduces JSON/text API responses by 60-80%.
+// Must be placed BEFORE routes and body parsers.
+app.use(compression({ threshold: 1024 })); // only compress responses > 1 KB
+
 // 10 MB limit to accommodate base64-encoded profile pictures in PDF export requests
 app.use(express.json({ limit: '10mb' }));
 
@@ -88,6 +94,13 @@ sequelize
   .catch((err) => console.log('❌ Error al sincronizar:', err));
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`🚀 Servidor de NEXT corriendo en puerto ${PORT} [${process.env.NODE_ENV || 'development'}]`);
+  // Warm up Chromium in the background so first PDF export is fast
+  warmBrowser();
 });
+
+// Keep connections alive through Render's 60-second proxy timeout.
+// headersTimeout must be > keepAliveTimeout to avoid race conditions.
+server.keepAliveTimeout = 65_000;  // 65 s
+server.headersTimeout   = 66_000;  // 66 s

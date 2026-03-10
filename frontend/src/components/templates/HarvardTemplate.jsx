@@ -95,7 +95,7 @@ const HarvardTemplate = ({ cvData = {}, profilePicture = null, onFirstExport }) 
     const techSkills = Array.isArray(skills?.technical) ? skills.technical : [];
     const softSkills = Array.isArray(skills?.soft) ? skills.soft : [];
     const allSkills = [...new Set([...techSkills, ...softSkills])].filter(Boolean);
-    const { workReferences, personalReferences } = normalizeReferenceGroups(cvData);
+    const { workReferences, personalReferences, familyReferences } = normalizeReferenceGroups(cvData);
 
     const validLangs = Array.isArray(languages)
         ? languages.filter(l => l && (l.language || typeof l === 'string'))
@@ -315,6 +315,19 @@ const HarvardTemplate = ({ cvData = {}, profilePicture = null, onFirstExport }) 
                                 <div style={{ marginTop: '8px' }}>
                                     {personalReferences.map((reference, i) => (
                                         <p className="cv-print-entry" key={`personal-${i}`} style={{ fontSize: '10pt', color: '#333', lineHeight: '1.7', margin: '0 0 8px' }}>
+                                            {formatReferenceLine(reference)}
+                                        </p>
+                                    ))}
+                                </div>
+                            </>
+                        )}
+
+                        {familyReferences.length > 0 && (
+                            <>
+                                <SectionHeading>REFERENCIAS FAMILIARES</SectionHeading>
+                                <div style={{ marginTop: '8px' }}>
+                                    {familyReferences.map((reference, i) => (
+                                        <p className="cv-print-entry" key={`family-${i}`} style={{ fontSize: '10pt', color: '#333', lineHeight: '1.7', margin: '0 0 8px' }}>
                                             {formatReferenceLine(reference)}
                                         </p>
                                     ))}

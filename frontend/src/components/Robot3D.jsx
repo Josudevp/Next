@@ -14,6 +14,52 @@ function isWebGLAvailable() {
   }
 }
 
+// ── Detección de hardware de gama baja ──────────────────────────────────────
+// Capas de señales (de mayor a menor soporte de browser):
+//
+//  UNIVERSAL (Chrome · Firefox · Safari · Edge · Android · iOS):
+//    hardwareConcurrency  → núcleos lógicos
+//    prefers-reduced-motion → preferencia de accesibilidad del OS
+//    Micro-benchmark JS   → tiempo real de ejecución en el dispositivo
+//
+//  CHROME / EDGE sólo (undefined en Firefox/Safari, código lo tolera):
+//    navigator.deviceMemory  → GB de RAM reportados
+//    navigator.connection    → calidad de red
+//
+// Se ejecuta DENTRO de useEffect (post-paint), por lo que el benchmark
+// síncrono (~200k operaciones) no bloquea el primer fotograma visible.
+function isLowEndDevice() {
+  // ① Preferencia de accesibilidad del OS — el primer check, sin coste (universal)
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return true;
+
+  // ② ≤ 2 GB RAM (Chrome/Edge — omitido en Firefox/Safari)
+  const ram = navigator?.deviceMemory;
+  if (ram !== undefined && ram <= 2) return true;
+
+  // ③ ≤ 2 núcleos lógicos — universal, iOS/Android/desktop
+  const cores = navigator?.hardwareConcurrency;
+  if (cores !== undefined && cores <= 2) return true;
+
+  // ④ Conexión muy lenta (Chrome/Edge — omitido en Firefox/Safari)
+  const conn = navigator?.connection;
+  if (conn && ['slow-2g', '2g'].includes(conn.effectiveType)) return true;
+
+  // ⑤ Micro-benchmark puro de JS — funciona en TODOS los browsers
+  //    Mide 200 000 operaciones √; resultados típicos:
+  //      Desktop moderno / iPhone reciente   →  < 6 ms
+  //      Gama media Android                  →  10–25 ms
+  //      Dispositivo lento (Mediatek entry)  →  40–120 ms
+  //    Umbral 40 ms cubre el segmento crítico sin generar falsos positivos
+  //    en dispositivos de gama media.
+  const t = performance.now();
+  let _x = 0;
+  for (let i = 0; i < 200_000; i++) _x += Math.sqrt(i);
+  void _x; // evitar que el optimizador elimine el bucle
+  if (performance.now() - t > 40) return true;
+
+  return false;
+}
+
 // ── Error Boundary local ────────────────────────────────────────────────────
 class SplineErrorBoundary extends Component {
   constructor(props) {
@@ -37,7 +83,7 @@ class SplineErrorBoundary extends Component {
   }
 }
 
-// ── UI de Respaldo cuando no hay 3D ─────────────────────────────────────────
+// ── UI de Respaldo: WebGL no disponible ─────────────────────────────────────
 const FallbackUI = () => (
   <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-[#F8FAFC] rounded-3xl border border-gray-200 shadow-inner px-6 text-center">
     <div className="w-16 h-16 bg-blue-50 text-blue-500 rounded-2xl flex items-center justify-center">
@@ -59,20 +105,45 @@ const FallbackUI = () => (
   </div>
 );
 
+// ── UI de Respaldo: hardware insuficiente ───────────────────────────────────
+const LowEndFallback = () => (
+  <div className="w-full h-full flex flex-col items-center justify-center gap-4 bg-[#F8FAFC] rounded-3xl border border-gray-200 shadow-inner px-6 text-center">
+    <div className="w-16 h-16 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center">
+      {/* Ícono de relámpago / modo ahorro */}
+      <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+      </svg>
+    </div>
+    <div>
+      <h3 className="text-gray-900 font-bold text-lg">IA Coach</h3>
+      <p className="text-sm text-gray-500 max-w-[250px] mt-1">
+        El modelo 3D fue desactivado automáticamente para mantener la página fluida en tu dispositivo.
+      </p>
+    </div>
+  </div>
+);
+
 // ── Componente principal ────────────────────────────────────────────────────
 export default function Robot3D() {
   const containerRef = useRef(null);
   const [canRender, setCanRender] = useState(false);
   const [hasWebGL, setHasWebGL] = useState(true);
+  const [isLowEnd, setIsLowEnd] = useState(false);
 
   useEffect(() => {
-    // 1. Verificamos soporte a nivel de hardware/browser
+    // 1. Detección de hardware — primero, antes de tocar WebGL
+    if (isLowEndDevice()) {
+      setIsLowEnd(true);
+      return;
+    }
+
+    // 2. Verificamos soporte a nivel de hardware/browser
     if (!isWebGLAvailable()) {
       setHasWebGL(false);
       return;
     }
 
-    // 2. Control de renderizado para evitar errores si no hay tamaño
+    // 3. Control de renderizado para evitar errores si no hay tamaño
     const el = containerRef.current;
     if (!el) return;
 
@@ -96,7 +167,16 @@ export default function Robot3D() {
     return () => observer.disconnect();
   }, []);
 
-  // Si no hay WebGL, ni siquiera intentamos montar Spline
+  // Dispositivo de gama baja → mostramos fallback sin intentar cargar Spline
+  if (isLowEnd) {
+    return (
+      <div className="w-full h-[400px] flex justify-center items-center p-4">
+        <LowEndFallback />
+      </div>
+    );
+  }
+
+  // Sin WebGL → fallback específico
   if (!hasWebGL) {
     return (
       <div className="w-full h-[400px] flex justify-center items-center p-4">

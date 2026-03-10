@@ -1,5 +1,4 @@
-import puppeteer from 'puppeteer-core';
-import chromium from '@sparticuz/chromium';
+import { getBrowser } from '../services/browserPool.js';
 import { renderCvHtml } from '../services/cvHtmlRenderer.js';
 
 /**
@@ -7,9 +6,8 @@ import { renderCvHtml } from '../services/cvHtmlRenderer.js';
  * Body: { cvData: object, templateId: string, profilePicture: string|null }
  * Returns: application/pdf binary stream.
  *
- * Uses @sparticuz/chromium — a stripped, statically-linked Chromium binary
- * compiled for Linux containers (Render, Lambda, etc.) — so no system-level
- * Chrome installation or shared library dependencies are needed.
+ * Uses a shared Chromium instance (browserPool) so launch cost (~4 s) is
+ * paid only once at server startup, not on every download request.
  */
 export const exportCvPdf = async (req, res) => {
     const { cvData, templateId, profilePicture } = req.body;
@@ -18,18 +16,10 @@ export const exportCvPdf = async (req, res) => {
         return res.status(400).json({ error: 'cvData es requerido y debe ser un objeto.' });
     }
 
-    let browser;
+    let page;
     try {
-        browser = await puppeteer.launch({
-            // @sparticuz/chromium provides a pre-set optimised args list and
-            // the path to its bundled Chromium binary — no system Chrome needed.
-            args: chromium.args,
-            defaultViewport: { width: 816, height: 1056, deviceScaleFactor: 1 },
-            executablePath: await chromium.executablePath(),
-            headless: true,
-        });
-
-        const page = await browser.newPage();
+        const browser = await getBrowser();
+        page = await browser.newPage();
 
         // Render HTML string for the requested template
         const html = renderCvHtml(
@@ -43,7 +33,7 @@ export const exportCvPdf = async (req, res) => {
 
         const pdfBuffer = await page.pdf({
             format: 'Letter',
-            printBackground: true,         // Render background colors/images
+            printBackground: true,
             margin: { top: '0', right: '0', bottom: '0', left: '0' },
         });
 
@@ -57,7 +47,6 @@ export const exportCvPdf = async (req, res) => {
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="CV_${safeName}.pdf"`);
-        // Expose header so browsers can read it cross-origin (needed for Blob download)
         res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
         res.setHeader('Content-Length', pdfBuffer.length);
         res.end(pdfBuffer);
@@ -65,7 +54,7 @@ export const exportCvPdf = async (req, res) => {
         console.error('[exportCvPdf] Error generando PDF:', err);
         res.status(500).json({ error: 'No se pudo generar el PDF. Intenta de nuevo.' });
     } finally {
-        // Always close the browser instance to free memory
-        await browser?.close();
+        // Close only the page (tab), never the shared browser
+        await page?.close();
     }
 };

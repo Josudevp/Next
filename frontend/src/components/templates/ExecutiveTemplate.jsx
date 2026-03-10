@@ -60,7 +60,7 @@ const ExecutiveTemplate = ({ cvData = {}, profilePicture = null, onFirstExport }
     const techSkills = Array.isArray(skills?.technical) ? skills.technical : [];
     const softSkills = Array.isArray(skills?.soft)      ? skills.soft      : [];
     const allSkills  = [...new Set([...techSkills, ...softSkills])].filter(Boolean);
-    const { workReferences, personalReferences } = normalizeReferenceGroups(cvData);
+    const { workReferences, personalReferences, familyReferences } = normalizeReferenceGroups(cvData);
     const validLangs = Array.isArray(languages)
         ? languages.filter(l => l && (l.language || typeof l === 'string')) : [];
     const hasData = !!(personalInfo.name || summary || education.length || experience.length);
@@ -240,6 +240,17 @@ const ExecutiveTemplate = ({ cvData = {}, profilePicture = null, onFirstExport }
                                         <SectionHead>Referencias Personales</SectionHead>
                                         {personalReferences.map((reference, i) => (
                                             <p className="cv-print-entry" key={`personal-${i}`} style={{ fontFamily: SERIF, fontSize: '9.3pt', color: '#444', lineHeight: '1.8', textAlign: 'center', margin: '0 0 6px' }}>
+                                                {formatReferenceLine(reference)}
+                                            </p>
+                                        ))}
+                                    </>
+                                )}
+
+                                {familyReferences.length > 0 && (
+                                    <>
+                                        <SectionHead>Referencias Familiares</SectionHead>
+                                        {familyReferences.map((reference, i) => (
+                                            <p className="cv-print-entry" key={`family-${i}`} style={{ fontFamily: SERIF, fontSize: '9.3pt', color: '#444', lineHeight: '1.8', textAlign: 'center', margin: '0 0 6px' }}>
                                                 {formatReferenceLine(reference)}
                                             </p>
                                         ))}

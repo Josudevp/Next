@@ -48,7 +48,7 @@ const ModernBlueTemplate = ({ cvData = {}, profilePicture = null, onFirstExport 
     const techSkills = Array.isArray(skills?.technical) ? skills.technical : [];
     const softSkills = Array.isArray(skills?.soft) ? skills.soft : [];
     const allSkills = [...new Set([...techSkills, ...softSkills])].filter(Boolean);
-    const { workReferences, personalReferences } = normalizeReferenceGroups(cvData);
+    const { workReferences, personalReferences, familyReferences } = normalizeReferenceGroups(cvData);
 
     const validLangs = Array.isArray(languages)
         ? languages.filter(l => l && (l.language || typeof l === 'string'))
@@ -373,6 +373,19 @@ const ModernBlueTemplate = ({ cvData = {}, profilePicture = null, onFirstExport 
                                         <div className="cv-print-section" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                             {personalReferences.map((reference, i) => (
                                                 <p className="cv-print-entry" key={`personal-${i}`} style={{ fontSize: '9.3pt', color: '#555', lineHeight: '1.65', margin: 0 }}>
+                                                    {formatReferenceLine(reference)}
+                                                </p>
+                                            ))}
+                                        </div>
+                                    </>
+                                )}
+
+                                {familyReferences.length > 0 && (
+                                    <>
+                                        <BodyHeading>Referencias Familiares</BodyHeading>
+                                        <div className="cv-print-section" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                            {familyReferences.map((reference, i) => (
+                                                <p className="cv-print-entry" key={`family-${i}`} style={{ fontSize: '9.3pt', color: '#555', lineHeight: '1.65', margin: 0 }}>
                                                     {formatReferenceLine(reference)}
                                                 </p>
                                             ))}

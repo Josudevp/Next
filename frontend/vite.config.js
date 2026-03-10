@@ -20,43 +20,53 @@ export default defineConfig({
 
   build: {
     sourcemap: false,
-    // Target: navegadores modernos con amplio soporte (~2019+).
-    // Evita polyfills innecesarios que inflaban el bundle.
+    // Target: modern browsers (~2019+). Avoids unnecessary polyfills.
     target: ['es2019', 'chrome79', 'firefox78', 'safari13', 'edge79'],
     chunkSizeWarningLimit: 600,
-    cssCodeSplit: true,       // CSS por ruta: solo carga lo que necesita cada página
-    minify: 'esbuild',        // esbuild es 20-40x más rápido que terser, mismo resultado
+    cssCodeSplit: true,      // Per-route CSS: only load what each page needs
+    minify: 'esbuild',       // 20-40x faster than terser, same output quality
     rollupOptions: {
+      treeshake: {
+        // Aggressive tree-shaking: assume modules have no side-effects
+        // unless explicitly declared. Cuts dead code more aggressively.
+        preset: 'recommended',
+      },
       output: {
-        // Separar vendors pesados en chunks independientes con nombre estable.
-        // El navegador los cachea entre deploys si no cambian.
+        // Stable vendor chunk names → aggressive browser caching between deploys
         manualChunks: (id) => {
-          // React core — cambia rara vez, cacheo agresivo
           if (id.includes('node_modules/react') || id.includes('node_modules/react-dom')) {
             return 'vendor-react';
           }
-          // Spline 3D — muy pesado (~2MB), aislado para no bloquear nada
+          // Spline 3D — very heavy (~2 MB), isolated so it never blocks other chunks
           if (id.includes('@splinetool')) {
             return 'vendor-spline';
           }
-          // React Router
           if (id.includes('react-router')) {
             return 'vendor-router';
           }
-          // Iconos Lucide
           if (id.includes('lucide-react')) {
             return 'vendor-lucide';
           }
-          // Resto de node_modules en un chunk compartido
+          // react-markdown + its remark/rehype deps
+          if (id.includes('react-markdown') || id.includes('remark') || id.includes('rehype') || id.includes('unified')) {
+            return 'vendor-markdown';
+          }
+          // pdf libs — only loaded on CV page
+          if (id.includes('jspdf') || id.includes('html2canvas')) {
+            return 'vendor-pdf';
+          }
           if (id.includes('node_modules')) {
             return 'vendor-misc';
           }
         },
-        // Nombre de assets con hash para cache busting correcto
         chunkFileNames: 'assets/js/[name]-[hash].js',
         entryFileNames: 'assets/js/[name]-[hash].js',
         assetFileNames: 'assets/[ext]/[name]-[hash].[ext]',
       },
+    },
+    // Remove license banner comments from vendor bundles (~3-8 KB saved)
+    esbuildOptions: {
+      legalComments: 'none',
     },
   },
 });

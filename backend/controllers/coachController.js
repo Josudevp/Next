@@ -236,7 +236,8 @@ SECUENCIA OBLIGATORIA (nunca te saltes un paso, siempre sigue este orden):
   PASO 4   → Experiencia Laboral
   PASO 5   → Habilidades (técnicas y blandas)
   PASO 6   → Idiomas
-    PASO 7   → Referencias laborales y personales
+    PASO 7a  → Referencias personales
+  PASO 7b  → Referencias familiares
   FIN      → Generar JSON final
 
 ⚠️  TRANSICIÓN OBLIGATORIA:
@@ -282,10 +283,10 @@ ${contactDataBlock}
 6. IDIOMAS: nombre e nivel de cada idioma (ej. "Inglés — Avanzado B2").
    Después de cada uno pregunta si desea agregar otro.
 
-7. REFERENCIAS:
-    - Referencias laborales: nombre, cargo/relación, empresa, teléfono y/o email.
-    - Referencias personales: nombre, relación, teléfono y/o email.
-    - Pregunta si desea agregar más de una en cada grupo.
+7a. REFERENCIAS PERSONALES: nombre, cargo/ocupación y número de teléfono.
+    - Pregunta si desea agregar más de una.
+7b. REFERENCIAS FAMILIARES: nombre, cargo/ocupación y número de teléfono.
+    - Pregunta si desea agregar más de una.
 
 ━━━ MODO ASISTIDO (solo si assistedMode = true) ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 Para Perfil Profesional, Experiencia y Habilidades:
@@ -303,7 +304,7 @@ Para Perfil Profesional, Experiencia y Habilidades:
 Desde el PASO 0.5 en adelante, al FINAL de cada respuesta donde el usuario aporte datos,
 incluye el siguiente bloque oculto con TODOS los datos recolectados hasta ese momento:
 
-[CV_PARTIAL]{"personalInfo":{...},"includePhoto":bool,"summary":"...","education":[...],"experience":[...],"skills":{"technical":[...],"soft":[...]},"languages":[...],"workReferences":[...],"personalReferences":[...]}[/CV_PARTIAL]
+[CV_PARTIAL]{"personalInfo":{...},"includePhoto":bool,"summary":"...","education":[...],"experience":[...],"skills":{"technical":[...],"soft":[...]},"languages":[...],"personalReferences":[...],"familyReferences":[...]}[/CV_PARTIAL]
 
 Reglas del bloque [CV_PARTIAL]:
 - Incluye TODOS los campos recolectados. Para datos aún vacíos usa null, [] o "".
@@ -339,11 +340,11 @@ ${jsonContactExtra}  },
   "languages": [
     { "language": "...", "level": "..." }
   ],
-    "workReferences": [
-        { "name": "...", "relation": "...", "company": "...", "phone": "...", "email": "..." }
-    ],
     "personalReferences": [
-        { "name": "...", "relation": "...", "phone": "...", "email": "..." }
+        { "name": "...", "position": "...", "phone": "..." }
+    ],
+    "familyReferences": [
+        { "name": "...", "position": "...", "phone": "..." }
     ],
   "hasExperience": true
 }
@@ -354,12 +355,12 @@ REGLAS DEL JSON:
 - Experiencias marcadas como proyecto → "projectLabel": true en "experience".
 - "skills.technical" y "skills.soft" deben ser arrays, nunca texto plano.
 - "languages" debe ser un array de objetos con "language" y "level". Si no hay idiomas usa [].
-- "workReferences" y "personalReferences" deben ser arrays. Si no hay referencias usa [].
+- "personalReferences" y "familyReferences" deben ser arrays. Si no hay referencias usa [].
 
 ${stateRule}`;
     } catch (error) {
         console.error('[buildCvGenerationPrompt] Error:', error.message);
-        return `Eres el asistente de creación de CVs de NEXT. Sigue en orden: (0) modo asistido, (0.5) foto, (1) datos básicos, (2) perfil profesional, (3) educación, (4) experiencia, (5) habilidades, (6) idiomas, (7) referencias laborales y personales. Genera el JSON con templateId="${templateId}", languages array, workReferences, personalReferences y projectLabel en experience, entre tags [CV_FINAL_DATA]...[/CV_FINAL_DATA].`;
+        return `Eres el asistente de creación de CVs de NEXT. Sigue en orden: (0) modo asistido, (0.5) foto, (1) datos básicos, (2) perfil profesional, (3) educación, (4) experiencia, (5) habilidades, (6) idiomas, (7a) referencias personales, (7b) referencias familiares. Genera el JSON con templateId="${templateId}", languages array, personalReferences, familyReferences y projectLabel en experience, entre tags [CV_FINAL_DATA]...[/CV_FINAL_DATA].`;
     }
 };
 
