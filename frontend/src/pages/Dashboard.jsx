@@ -2,8 +2,8 @@ import { useEffect, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import API_URL from '../api/api'
 import {
-  Bell, ChevronRight, Lightbulb, Bot,
-  Briefcase, TrendingUp, LogOut, User as UserIcon, HelpCircle, FileText
+  Bell, ChevronRight, Bot,
+  Briefcase, TrendingUp, LogOut, User as UserIcon, HelpCircle, FileText, Globe
 } from 'lucide-react'
 import LogoNext from '../components/LogoNext'
 import axiosInstance from '../api/axiosInstance'
@@ -276,8 +276,6 @@ const Dashboard = () => {
 
   const firstName = user.name ? user.name.split(' ')[0] : 'Usuario'
   const skillsArray = profile?.skills || []
-  const weeklySkill = skillsArray[0] || 'Comunicación efectiva'
-  const skillBoost = Math.max(4, Math.min(8, 15 - skillsArray.length))
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
@@ -449,35 +447,28 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* ── BANNER: Habilidad de la semana ──────────── */}
-        <div
-          className="rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shadow-[0_2px_12px_rgba(37,99,235,0.1)] animate-fade-in-up cursor-pointer"
-          style={{ background: 'linear-gradient(135deg, #1B49AE 0%, #2563EB 50%, #22D3EE 100%)' }}
-          onClick={() => navigate('/ia-coach')}
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center flex-shrink-0">
-              <Lightbulb size={20} className="text-yellow-300" />
+        {/* ── Portfolio Web Banner ───────────── */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)] flex items-center justify-between gap-4 animate-fade-in-up">
+          <div className="flex items-center gap-4 flex-1 min-w-0">
+            <div className="hidden sm:flex w-12 h-12 rounded-xl bg-[#EFF6FF] border border-[#BFDBFE] items-center justify-center flex-shrink-0">
+              <Globe size={22} className="text-[#2563EB]" />
             </div>
-            <div>
-              <p className="text-white/70 text-xs font-medium uppercase tracking-wide mb-0.5">
-                Habilidad de la semana
-              </p>
-              <p className="text-white font-semibold text-sm sm:text-base">
-                <span className="font-bold">{weeklySkill}</span>
-                {' — '}Mejorar esta habilidad podría aumentar tu empleabilidad en un{' '}
-                <span className="text-yellow-300 font-bold">+{skillBoost}%</span>
+            <div className="min-w-0">
+              <p className="font-bold text-gray-900 text-sm mb-0.5">Portfolio Web — Nuevo</p>
+              <p className="text-xs text-gray-500 leading-relaxed">
+                Convierte tu CV en una landing page profesional lista para compartir o publicar.
               </p>
             </div>
           </div>
-
-          <button
-            onClick={(e) => { e.stopPropagation(); navigate('/ia-coach'); }}
-            className="flex items-center justify-center gap-1.5 self-start sm:self-auto bg-white/15 hover:bg-white/25 border border-white/20 text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition-all cursor-pointer flex-shrink-0 backdrop-blur-sm"
+          <Link
+            to="/portfolio"
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] flex-shrink-0"
+            style={{ background: 'linear-gradient(to right, #1D4ED8, #2563EB)' }}
           >
-            Practicar <ChevronRight size={13} />
-          </button>
+            Generar <ChevronRight size={14} />
+          </Link>
         </div>
+
 
       </main>
     </div>

@@ -16,6 +16,7 @@ import userRoutes from './routes/userRoutes.js';
 import jobRoutes from './routes/jobRoutes.js';
 import cvRoutes from './routes/cvRoutes.js';
 import exportRoutes from './routes/exportRoutes.js';
+import portfolioRoutes from './routes/portfolioRoutes.js';
 
 const app = express();
 
@@ -70,6 +71,7 @@ app.use('/api/user', userRoutes);
 app.use('/api/jobs', jobRoutes);      // Job Hunter
 app.use('/api/cv', cvRoutes);         // CV Generator (save/load)
 app.use('/api/export', exportRoutes); // Server-side PDF export via Puppeteer
+app.use('/api/portfolio', portfolioRoutes); // Portfolio web generator
 
 // ── Health checks para Render ─────────────────────────────────────────────────
 // Render hace un GET periódico para verificar que el servicio está vivo.
