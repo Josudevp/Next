@@ -6,7 +6,7 @@ services:
     plan: free
     region: oregon
     rootDir: backend
-    buildCommand: apt-get install -y --no-install-recommends libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2 libx11-xcb1 && npm install
+    buildCommand: npm install
     startCommand: node server.js
     healthCheckPath: /health
     envVars:
@@ -43,6 +43,10 @@ services:
         value: public, max-age=31536000, immutable
       # HTML entry point — NEVER cache; must always fetch the latest version
       - path: /index.html
+        name: Cache-Control
+        value: no-cache, no-store, must-revalidate
+      # SPA routes are rewritten to index.html; avoid stale HTML at / and deep links
+      - path: /*
         name: Cache-Control
         value: no-cache, no-store, must-revalidate
       - path: /*
