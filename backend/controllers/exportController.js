@@ -1,14 +1,15 @@
-import puppeteer from 'puppeteer';
+import puppeteer from 'puppeteer-core';
+import chromium from '@sparticuz/chromium';
 import { renderCvHtml } from '../services/cvHtmlRenderer.js';
 
 /**
  * POST /api/export/pdf
  * Body: { cvData: object, templateId: string, profilePicture: string|null }
- * Returns: application/pdf binary stream (triggers browser file-save dialog).
+ * Returns: application/pdf binary stream.
  *
- * Uses a headless Chromium instance (bundled with puppeteer) to render the
- * pure-HTML template and export an exact A4/Letter PDF — fully independent
- * of the user's browser or device. Works on Android, iOS, and desktop.
+ * Uses @sparticuz/chromium — a stripped, statically-linked Chromium binary
+ * compiled for Linux containers (Render, Lambda, etc.) — so no system-level
+ * Chrome installation or shared library dependencies are needed.
  */
 export const exportCvPdf = async (req, res) => {
     const { cvData, templateId, profilePicture } = req.body;
@@ -20,30 +21,15 @@ export const exportCvPdf = async (req, res) => {
     let browser;
     try {
         browser = await puppeteer.launch({
+            // @sparticuz/chromium provides a pre-set optimised args list and
+            // the path to its bundled Chromium binary — no system Chrome needed.
+            args: chromium.args,
+            defaultViewport: { width: 816, height: 1056, deviceScaleFactor: 1 },
+            executablePath: await chromium.executablePath(),
             headless: true,
-            args: [
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                // On Linux containers (Render) /dev/shm may be small; use /tmp instead
-                '--disable-dev-shm-usage',
-                '--disable-accelerated-2d-canvas',
-                '--disable-gpu',
-                '--no-first-run',
-                '--no-zygote',
-                '--disable-extensions',
-                '--disable-background-networking',
-                '--disable-default-apps',
-                '--mute-audio',
-                '--disable-sync',
-                '--disable-translate',
-                '--hide-scrollbars',
-            ],
         });
 
         const page = await browser.newPage();
-
-        // Set viewport to match Letter width (816px @ 96dpi = 8.5in)
-        await page.setViewport({ width: 816, height: 1056, deviceScaleFactor: 1 });
 
         // Render HTML string for the requested template
         const html = renderCvHtml(
@@ -76,7 +62,7 @@ export const exportCvPdf = async (req, res) => {
         res.setHeader('Content-Length', pdfBuffer.length);
         res.end(pdfBuffer);
     } catch (err) {
-        console.error('[exportCvPdf] Error generando PDF:', err.message);
+        console.error('[exportCvPdf] Error generando PDF:', err);
         res.status(500).json({ error: 'No se pudo generar el PDF. Intenta de nuevo.' });
     } finally {
         // Always close the browser instance to free memory
