@@ -39,14 +39,39 @@ const scopeBadge = {
   remoto:        { label: '🏠 Remoto',          color: 'text-teal-600 bg-teal-50 border-teal-100' },
 }
 
+const matchBadge = {
+  alto: {
+    label: 'Match alto',
+    shell: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    progress: 'from-emerald-500 to-teal-500',
+  },
+  medio: {
+    label: 'Match medio',
+    shell: 'border-amber-200 bg-amber-50 text-amber-700',
+    progress: 'from-amber-500 to-orange-500',
+  },
+  bajo: {
+    label: 'Match bajo',
+    shell: 'border-rose-200 bg-rose-50 text-rose-700',
+    progress: 'from-rose-500 to-pink-500',
+  },
+}
+
 // ─── Componente: Tarjeta de empleo ────────────────────────────────────────────
 const JobCard = ({ job }) => {
   const navigate = useNavigate()
+  const [imageError, setImageError] = useState(false)
   const badge = employmentTypeBadge[job.job_employment_type] || null
   const scope = scopeBadge[job._scope] || null
   const salary = formatSalary(job.job_min_salary, job.job_max_salary, job.job_salary_currency)
   const posted = timeAgo(job.job_posted_at_datetime_utc)
   const location = [job.job_city, job.job_country].filter(Boolean).join(', ')
+  const match = job.matchAnalysis || null
+  const matchTone = matchBadge[match?.band] || matchBadge.medio
+  const isCapped = match?.experienceCapped || false
+  const topMissing = match?.missingSkills?.slice(0, 3) || []
+  const topStrengths = isCapped ? [] : (match?.strengths?.slice(0, 3) || [])
+  const topResources = match?.resources?.slice(0, 2) || []
 
   return (
     <article className="bg-white rounded-2xl border border-gray-100 shadow-[0_2px_12px_rgba(0,0,0,0.04)] p-5 hover:border-purple-200 hover:shadow-[0_4px_20px_rgba(139,92,246,0.1)] transition-all duration-200 flex flex-col gap-4">
@@ -55,15 +80,15 @@ const JobCard = ({ job }) => {
       <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-3 min-w-0">
           {/* Logo o fallback con inicial */}
-          {job.employer_logo ? (
+          {job.employer_logo && !imageError ? (
             <img
               src={job.employer_logo}
               alt={job.employer_name}
-              className="w-11 h-11 rounded-xl object-contain border border-gray-100 bg-white flex-shrink-0 p-0.5"
-              onError={(e) => { e.currentTarget.replaceWith(fallbackLogo(job.employer_name)) }}
+              className="w-11 h-11 rounded-xl object-contain border border-gray-100 bg-white shrink-0 p-0.5"
+              onError={() => setImageError(true)}
             />
           ) : (
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-purple-100 to-violet-100 border border-purple-100 flex items-center justify-center flex-shrink-0">
+            <div className="w-11 h-11 rounded-xl bg-linear-to-br from-purple-100 to-violet-100 border border-purple-100 flex items-center justify-center shrink-0">
               <span className="text-purple-600 font-bold text-sm">
                 {job.employer_name?.[0]?.toUpperCase() || '?'}
               </span>
@@ -79,7 +104,21 @@ const JobCard = ({ job }) => {
           </div>
         </div>
 
-        <div className="flex flex-col items-end gap-1 flex-shrink-0">
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          {match && (
+            <div className={`min-w-[104px] rounded-2xl border px-3 py-2 ${matchTone.shell}`}>
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.12em]">IA Match</span>
+                <span className="text-lg font-black leading-none">{match.score}%</span>
+              </div>
+              <div className="mt-2 h-1.5 rounded-full bg-white/70 overflow-hidden">
+                <div
+                  className={`h-full rounded-full bg-linear-to-r ${matchTone.progress}`}
+                  style={{ width: `${match.score}%` }}
+                />
+              </div>
+            </div>
+          )}
           {scope && (
             <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${scope.color}`}>
               {scope.label}
@@ -101,7 +140,7 @@ const JobCard = ({ job }) => {
           </span>
         )}
         {salary && (
-          <span className="flex items-center gap-1 font-semibold text-[#10B981]">
+          <span className="flex items-center gap-1 font-semibold text-next-success">
             💰 {salary}
           </span>
         )}
@@ -114,9 +153,70 @@ const JobCard = ({ job }) => {
 
       {/* Descripción (overflow truncado) */}
       {job.job_description && (
-        <p className="text-xs text-gray-500 leading-relaxed line-clamp-3 break-words">
+        <p className="text-xs text-gray-500 leading-relaxed line-clamp-3 wrap-break-word">
           {job.job_description.replace(/\n+/g, ' ').trim()}
         </p>
+      )}
+
+      {match && (
+        <section className={`rounded-2xl border p-3.5 space-y-3 ${
+          isCapped
+            ? 'border-rose-200 bg-rose-50/70'
+            : 'border-slate-200 bg-slate-50/80'
+        }`}>
+          <div className="flex items-start gap-2">
+            <AlertCircle size={15} className={`mt-0.5 shrink-0 ${isCapped ? 'text-rose-400' : 'text-slate-400'}`} />
+            <p className={`text-xs leading-relaxed ${isCapped ? 'text-rose-700 font-medium' : 'text-slate-600'}`}>
+              {match.summary}
+            </p>
+          </div>
+
+          {topStrengths.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {topStrengths.map((skill) => (
+                <span
+                  key={`${job.job_id}-strength-${skill}`}
+                  className="rounded-full border border-emerald-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-emerald-700"
+                >
+                  Fuerte en {skill}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {topMissing.length > 0 && (
+            <div>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400 mb-2">Gaps detectados</p>
+              <div className="flex flex-wrap gap-1.5">
+                {topMissing.map((skill) => (
+                  <span
+                    key={`${job.job_id}-gap-${skill}`}
+                    className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-700"
+                  >
+                    Falta {skill}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {topResources.length > 0 && (
+            <div className="space-y-1.5">
+              {topResources.map((resource) => (
+                <a
+                  key={`${job.job_id}-resource-${resource.skill}`}
+                  href={resource.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-600 transition-colors hover:border-purple-200 hover:text-purple-700"
+                >
+                  <span>Aprende {resource.skill} con {resource.title}</span>
+                  <ChevronRight size={14} />
+                </a>
+              ))}
+            </div>
+          )}
+        </section>
       )}
 
       {/* CTA */}
@@ -184,7 +284,7 @@ const ErrorState = ({ message, onRetry }) => (
 const SkeletonCard = () => (
   <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4 animate-pulse">
     <div className="flex items-center gap-3">
-      <div className="w-11 h-11 rounded-xl bg-gray-100 flex-shrink-0" />
+      <div className="w-11 h-11 rounded-xl bg-gray-100 shrink-0" />
       <div className="flex-1 space-y-2">
         <div className="h-3 bg-gray-100 rounded-full w-2/3" />
         <div className="h-4 bg-gray-100 rounded-full w-full" />
@@ -212,6 +312,7 @@ const FILTER_TABS = [
   { key: 'todas',         label: 'Todas' },
   { key: 'colombia',      label: '🇨🇴 Colombia' },
   { key: 'internacional', label: '🌐 Internacional' },
+  { key: 'remoto',        label: '🏠 Remoto' },
 ]
 
 const JobHunter = () => {
@@ -283,7 +384,7 @@ const JobHunter = () => {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC]">
+    <div className="min-h-screen bg-next-gray">
 
       {/* ════════════════ NAV ════════════════ */}
       <nav className="bg-white border-b border-gray-100 sticky top-0 z-40 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
@@ -319,7 +420,7 @@ const JobHunter = () => {
             Encuentra tu próximo trabajo
           </h1>
           <p className="text-purple-200 text-sm sm:text-base max-w-xl mx-auto">
-            Búsqueda impulsada por <strong className="text-white">JSearch</strong> — miles de ofertas reales filtradas para tu perfil.
+            Empleos remotos vía <strong className="text-white">Adzuna</strong> · <strong className="text-white">Remotive</strong> · <strong className="text-white">Jobicy</strong> — y empleos en Colombia vía <strong className="text-white">CareerJet</strong>.
           </p>
         </div>
       </header>
@@ -332,7 +433,7 @@ const JobHunter = () => {
         >
           {/* Campo: puesto */}
           <div className="flex items-center gap-2 flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus-within:border-purple-400 focus-within:ring-2 focus-within:ring-purple-100 transition-all">
-            <Search size={15} className="text-gray-400 flex-shrink-0" />
+            <Search size={15} className="text-gray-400 shrink-0" />
             <input
               type="text"
               value={inputQuery}
@@ -344,7 +445,7 @@ const JobHunter = () => {
 
           {/* Campo: ubicación */}
           <div className="flex items-center gap-2 w-full sm:w-44 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 focus-within:border-purple-400 focus-within:ring-2 focus-within:ring-purple-100 transition-all">
-            <MapPin size={15} className="text-gray-400 flex-shrink-0" />
+            <MapPin size={15} className="text-gray-400 shrink-0" />
             <input
               type="text"
               value={inputLocation}
@@ -357,7 +458,7 @@ const JobHunter = () => {
           <button
             type="submit"
             disabled={loading}
-            className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer flex-shrink-0"
+            className="flex items-center justify-center gap-2 px-6 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer shrink-0"
             style={{ background: 'linear-gradient(to right, #7C3AED, #8B5CF6)' }}
           >
             {loading
@@ -413,6 +514,9 @@ const JobHunter = () => {
             <span className="font-semibold text-gray-800">{filteredJobs.length} ofertas</span>
             {' '}para{' '}
             <span className="text-purple-600 font-semibold">"{activeQuery}"</span>
+            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
+              con IA de compatibilidad
+            </span>
             {isCached && (
               <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-green-50 text-green-600 border border-green-100">
                 ⚡ desde caché
@@ -451,10 +555,18 @@ const JobHunter = () => {
       <footer className="border-t border-gray-100 py-6 mt-4">
         <p className="text-center text-xs text-gray-400">
           Ofertas agregadas vía{' '}
-          <a href="https://rapidapi.com/letscrape-6bRBa3Qgu05/api/jsearch" target="_blank" rel="noopener noreferrer" className="underline hover:text-purple-600">
-            JSearch (RapidAPI)
+          <a href="https://www.adzuna.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-purple-600">
+            Adzuna
           </a>
-          {' — fuentes: Computrabajo · Elempleo · LinkedIn · Indeed · bolsas locales Colombia. '}
+          {' · '}
+          <a href="https://remotive.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-purple-600">
+            Remotive
+          </a>
+          {' · '}
+          <a href="https://jobicy.com" target="_blank" rel="noopener noreferrer" className="underline hover:text-purple-600">
+            Jobicy
+          </a>
+          {' — empleos remotos globales accesibles desde Colombia. '}
           NEXT no se responsabiliza por el contenido de las ofertas externas.
         </p>
       </footer>

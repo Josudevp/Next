@@ -118,13 +118,26 @@ const ChatCoach = () => {
             const job = pendingJobPrepRef.current;
             pendingJobPrepRef.current = null;
             const location = [job.job_city, job.job_country].filter(Boolean).join(', ');
+            const matchSummary = job.matchAnalysis?.summary
+                ? `**Compatibilidad detectada por NEXT:** ${job.matchAnalysis.score}% (${job.matchAnalysis.band}).\n`
+                : '';
+            const strengthsSummary = job.matchAnalysis?.strengths?.length
+                ? `**Fortalezas detectadas:** ${job.matchAnalysis.strengths.join(', ')}\n`
+                : '';
+            const gapsSummary = job.matchAnalysis?.missingSkills?.length
+                ? `**Brechas detectadas:** ${job.matchAnalysis.missingSkills.join(', ')}\n`
+                : '';
+            const resourcesSummary = job.matchAnalysis?.resources?.length
+                ? `**Recursos sugeridos:** ${job.matchAnalysis.resources.map((resource) => `${resource.skill}: ${resource.url}`).join(' | ')}\n`
+                : '';
             const prompt =
                 `Quiero prepararme para aplicar a esta oferta laboral:\n\n` +
                 `**Cargo:** ${job.job_title || 'No especificado'}\n` +
                 `**Empresa:** ${job.employer_name || 'No especificada'}\n` +
                 `**Ubicación:** ${location || 'No especificada'}\n` +
                 `**Tipo de contrato:** ${job.job_employment_type || 'No especificado'}\n` +
-                `**Descripción:** ${(job.job_description || 'No disponible').slice(0, 800)}\n\n` +
+                `**Descripción:** ${(job.job_description || 'No disponible').slice(0, 800)}\n` +
+                `${matchSummary}${strengthsSummary}${gapsSummary}${resourcesSummary}\n` +
                 `¿Cómo debería prepararme para obtener este empleo? Dime qué habilidades técnicas y blandas debo destacar, qué podrían preguntarme en la entrevista y qué puedo mejorar según los requisitos.`;
             sendMessageRef.current(null, prompt);
         }
