@@ -2,10 +2,13 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
     ArrowLeft, Save, Camera, Upload, X, Plus,
-    FileText, CheckCircle, AlertCircle, Loader2, Trash2, Wand2
+    FileText, CheckCircle, AlertCircle, Loader2, Trash2, Wand2,
+    Bell, BellOff
 } from 'lucide-react'
 import LogoNext from '../components/LogoNext'
 import axiosInstance from '../api/axiosInstance'
+import Seo from '../components/Seo'
+import { mergeStoredUser } from '../utils/sessionUser'
 
 // ── Opciones fijas ────────────────────────────────────────────────────────────
 const EXPERIENCE_OPTIONS = [
@@ -15,6 +18,16 @@ const EXPERIENCE_OPTIONS = [
     '3-5 años',
     'Más de 5 años',
 ]
+
+const syncSessionUser = (profile) => {
+    if (!profile) return
+
+    mergeStoredUser({
+        name: profile.name,
+        email: profile.email,
+        profilePicture: profile.profilePicture,
+    })
+}
 
 // ── Sub-componente: Avatar con selector de foto ───────────────────────────────
 const AvatarUpload = ({ previewUrl, name, onChange }) => {
@@ -181,6 +194,9 @@ const ProfilePage = () => {
     const [goalInput, setGoalInput]           = useState('')
     const [isLoading, setIsLoading]           = useState(true)
     const [isSaving, setIsSaving]             = useState(false)
+    const [isDeletingPhoto, setIsDeletingPhoto] = useState(false)
+    const [isDeletingCv, setIsDeletingCv]       = useState(false)
+    const [hunterEnabled, setHunterEnabled]     = useState(true)
     const [alert, setAlert]                   = useState(null)   // { type, message }
 
     // ── Cargar perfil desde el backend ────────────────────────────────────────
@@ -201,6 +217,8 @@ const ProfilePage = () => {
                     setAvatarPreview(data.profilePicture)
                 }
                 setHasCv(data.hasCv || false)
+                setHunterEnabled(data.hunterNotificationsEnabled !== false)
+                syncSessionUser(data)
             } catch (err) {
                 console.error('[ProfilePage] Error cargando perfil:', err.message)
                 showAlert('error', 'No se pudo cargar el perfil. Intenta de nuevo.')
@@ -241,6 +259,60 @@ const ProfilePage = () => {
         setAvatarPreview(URL.createObjectURL(file))
     }
 
+    const handleRemoveAvatar = async () => {
+        if (avatarFile) {
+            setAvatarFile(null)
+            setAvatarPreview(profilePicture)
+            return
+        }
+
+        if (!profilePicture) return
+
+        const confirmed = window.confirm('¿Eliminar tu foto de perfil actual?')
+        if (!confirmed) return
+
+        setIsDeletingPhoto(true)
+        try {
+            const { data } = await axiosInstance.delete('/user/profile/picture')
+            setProfilePicture(null)
+            setAvatarPreview(null)
+            setAvatarFile(null)
+            syncSessionUser(data.user)
+            showAlert('success', data.mensaje || 'Foto de perfil eliminada.')
+        } catch (err) {
+            const msg = err.response?.data?.mensaje || 'No se pudo eliminar la foto de perfil.'
+            showAlert('error', msg)
+        } finally {
+            setIsDeletingPhoto(false)
+        }
+    }
+
+    const handleRemoveCv = async () => {
+        if (cvFile) {
+            setCvFile(null)
+            return
+        }
+
+        if (!hasCv) return
+
+        const confirmed = window.confirm('¿Eliminar el CV guardado en tu perfil?')
+        if (!confirmed) return
+
+        setIsDeletingCv(true)
+        try {
+            const { data } = await axiosInstance.delete('/user/profile/cv')
+            setCvFile(null)
+            setHasCv(false)
+            syncSessionUser(data.user)
+            showAlert('success', data.mensaje || 'CV eliminado.')
+        } catch (err) {
+            const msg = err.response?.data?.mensaje || 'No se pudo eliminar el CV.'
+            showAlert('error', msg)
+        } finally {
+            setIsDeletingCv(false)
+        }
+    }
+
     // ── Submit ────────────────────────────────────────────────────────────────
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -262,6 +334,8 @@ const ProfilePage = () => {
             if (avatarFile) fd.append('avatar', avatarFile)
             if (cvFile)     fd.append('cv',     cvFile)
 
+            fd.append('hunterNotificationsEnabled', String(hunterEnabled))
+
             const { data } = await axiosInstance.put('/user/profile', fd, {
                 headers: { 'Content-Type': 'multipart/form-data' },
                 timeout: 60000, // El PDF puede tardar en procesarse
@@ -270,8 +344,12 @@ const ProfilePage = () => {
             if (data.user?.profilePicture) {
                 setProfilePicture(data.user.profilePicture)
                 setAvatarPreview(data.user.profilePicture)
+            } else {
+                setProfilePicture(null)
+                setAvatarPreview(null)
             }
-            if (cvFile) setHasCv(true)
+            setHasCv(Boolean(data.user?.hasCv))
+            syncSessionUser(data.user)
 
             setAvatarFile(null)
             setCvFile(null)
@@ -300,6 +378,12 @@ const ProfilePage = () => {
 
     return (
         <div className="min-h-screen bg-next-gray">
+            <Seo
+                title={`Mi Perfil | ${formData.name || 'Usuario'} | Next Job Hunter`}
+                description="Gestiona tu perfil, foto y CV en Next Job Hunter."
+                path="/profile"
+                robots="noindex, nofollow"
+            />
 
             {/* ── Top Bar ────────────────────────────────────────────────── */}
             <header className="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-gray-100 px-4 sm:px-8 py-3 flex items-center justify-between">
@@ -342,11 +426,21 @@ const ProfilePage = () => {
                         <h2 className="text-base font-bold text-gray-800 mb-5">Información personal</h2>
 
                         <div className="flex flex-col sm:flex-row items-center gap-5">
-                            <AvatarUpload
-                                previewUrl={avatarPreview}
-                                name={formData.name}
-                                onChange={handleAvatarChange}
-                            />
+                            <div className="flex flex-col items-center gap-3">
+                                <AvatarUpload
+                                    previewUrl={avatarPreview}
+                                    name={formData.name}
+                                    onChange={handleAvatarChange}
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleRemoveAvatar}
+                                    disabled={isDeletingPhoto || (!avatarFile && !profilePicture)}
+                                    className="text-xs font-semibold text-red-500 hover:text-red-600 disabled:text-gray-300 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                                >
+                                    {isDeletingPhoto ? 'Eliminando foto...' : 'Eliminar foto'}
+                                </button>
+                            </div>
                             <div className="flex-1 flex flex-col gap-3">
                                 <div className="flex flex-col gap-1">
                                     <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Nombre</label>
@@ -399,14 +493,25 @@ const ProfilePage = () => {
 
                         {/* Crear CV con IA — CTA secundario */}
                         <div className="mt-3 pt-3 border-t border-gray-100">
-                            <button
-                                type="button"
-                                onClick={() => navigate('/coach?mode=createcv')}
-                                className="w-full flex items-center justify-center gap-2 text-sm font-semibold text-[#1B49AE] border border-[#1B49AE]/25 bg-blue-50/60 hover:bg-blue-100/60 rounded-xl px-4 py-2.5 transition-all cursor-pointer"
-                            >
-                                <Wand2 size={15} />
-                                Crear CV con IA
-                            </button>
+                            <div className="flex flex-col sm:flex-row gap-3">
+                                <button
+                                    type="button"
+                                    onClick={() => navigate('/coach?mode=createcv')}
+                                    className="flex-1 flex items-center justify-center gap-2 text-sm font-semibold text-[#1B49AE] border border-[#1B49AE]/25 bg-blue-50/60 hover:bg-blue-100/60 rounded-xl px-4 py-2.5 transition-all cursor-pointer"
+                                >
+                                    <Wand2 size={15} />
+                                    Crear CV con IA
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleRemoveCv}
+                                    disabled={isDeletingCv || (!cvFile && !hasCv)}
+                                    className="flex items-center justify-center gap-2 text-sm font-semibold text-red-500 border border-red-200 bg-red-50 hover:bg-red-100 rounded-xl px-4 py-2.5 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <Trash2 size={15} />
+                                    {isDeletingCv ? 'Eliminando CV...' : 'Eliminar CV'}
+                                </button>
+                            </div>
                         </div>
                     </section>
 
@@ -506,6 +611,39 @@ const ProfilePage = () => {
                                     ))}
                                 </div>
                             )}
+                        </div>
+                    </section>
+
+                    {/* ── Sección 4: Notificaciones ────────────────── */}
+                    <section className="bg-white rounded-2xl border border-gray-100 p-6 shadow-sm">
+                        <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3 min-w-0">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${hunterEnabled ? 'bg-blue-50' : 'bg-gray-100'}`}>
+                                    {hunterEnabled
+                                        ? <Bell size={18} className="text-next-primary" />
+                                        : <BellOff size={18} className="text-gray-400" />
+                                    }
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="text-sm font-semibold text-gray-800">Correo diario de vacantes</p>
+                                    <p className="text-xs text-gray-400 mt-0.5 leading-snug">
+                                        Recibe cada mañana un resumen de ofertas nuevas según tu perfil
+                                    </p>
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                role="switch"
+                                aria-checked={hunterEnabled}
+                                onClick={() => setHunterEnabled(prev => !prev)}
+                                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full transition-colors duration-200
+                                    ${hunterEnabled ? 'bg-next-primary' : 'bg-gray-300'}`}
+                            >
+                                <span
+                                    className={`inline-block h-5 w-5 self-center rounded-full bg-white shadow-sm transition-transform duration-200
+                                        ${hunterEnabled ? 'translate-x-5.5' : 'translate-x-0.5'}`}
+                                />
+                            </button>
                         </div>
                     </section>
 

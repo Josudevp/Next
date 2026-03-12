@@ -471,47 +471,54 @@ const fetchRemotive = async (query) => {
   }
 };
 
-/**
- * GET /api/jobs/search
- * Query params: query (string), location (string)
- */
-export const searchJobs = async (req, res) => {
-  const { query = '', location = '' } = req.query;
-  const userId = req.user?.userId;
-
-  // ── Obtener perfil del usuario para personalizar la búsqueda ─────────────
-  let userArea = '';
-  let userExperienceLevel = '';
-  let userProfile = null;
-
-  if (userId) {
-    try {
-      const user = await User.findByPk(userId, {
-        attributes: ['area', 'experienceLevel', 'skills', 'cvText'],
-      });
-      if (user?.area) userArea = user.area;
-      if (user?.experienceLevel) {
-        userExperienceLevel = user.experienceLevel;
-      }
-      userProfile = user;
-    } catch (err) {
-      console.warn('[JobController] No se pudo obtener perfil:', err.message);
-    }
+const getUserSearchProfile = async ({ userId, userOverride = null }) => {
+  if (userOverride) {
+    return {
+      userArea: userOverride.area || '',
+      userExperienceLevel: userOverride.experienceLevel || '',
+      userProfile: userOverride,
+    };
   }
 
-  // ── Construir query final ─────────────────────────────────────────────────
-  // Query limpio: solo puesto/área. El país va en el parámetro `country`.
-  // Agregar palabras extra (Colombia, entry level) al texto reduce resultados.
-  const baseQuery = query.trim() || userArea || 'software developer';
-  let finalQuery  = translateQuery(baseQuery);
+  if (!userId) {
+    return {
+      userArea: '',
+      userExperienceLevel: '',
+      userProfile: null,
+    };
+  }
 
-  // Solo añadir ubicación explícita si el usuario la escribió
+  try {
+    const user = await User.findByPk(userId, {
+      attributes: ['area', 'experienceLevel', 'skills', 'cvText'],
+    });
+
+    return {
+      userArea: user?.area || '',
+      userExperienceLevel: user?.experienceLevel || '',
+      userProfile: user,
+    };
+  } catch (err) {
+    console.warn('[JobController] No se pudo obtener perfil:', err.message);
+    return {
+      userArea: '',
+      userExperienceLevel: '',
+      userProfile: null,
+    };
+  }
+};
+
+export const searchJobsForUser = async ({ userId, query = '', location = '', requestMeta = {}, userOverride = null, resultLimit = 15 }) => {
+  const { userArea, userExperienceLevel, userProfile } = await getUserSearchProfile({ userId, userOverride });
+
+  const baseQuery = query.trim() || userArea || 'software developer';
+  let finalQuery = translateQuery(baseQuery);
+
   if (location.trim()) finalQuery += ` in ${location.trim()}`;
 
   const cacheKey = `${finalQuery}|${userExperienceLevel}`.toLowerCase();
-
-  // ── Caché hit ─────────────────────────────────────────────────────────────
   const cached = getCached(cacheKey) || getDevCached(cacheKey);
+
   if (cached) {
     const enrichedJobs = enrichJobsWithMatchData(cached, userProfile || {});
     enrichedJobs.sort((a, b) => {
@@ -519,87 +526,87 @@ export const searchJobs = async (req, res) => {
       const scoreB = (b.matchAnalysis?.score ?? 0) + (b._scope === 'colombia' ? 5 : 0);
       return scoreB - scoreA;
     });
-    const top15 = enrichedJobs.slice(0, 15);
-    console.log(`[JobController] Cache HIT "${cacheKey}" → ${top15.length} ofertas`);
-    return res.status(200).json({ jobs: top15, total: top15.length, cached: true, activeQuery: baseQuery });
+
+    const topJobs = enrichedJobs.slice(0, resultLimit);
+    console.log(`[JobController] Cache HIT "${cacheKey}" → ${topJobs.length} ofertas`);
+    return { jobs: topJobs, total: topJobs.length, cached: true, activeQuery: baseQuery };
   }
 
-  // ── Parámetros para Adzuna ────────────────────────────────────────────────
   const levelHint = QUERY_LEVEL_HINT[userExperienceLevel] || '';
   const enrichedQuery = levelHint ? `${finalQuery} ${levelHint}` : finalQuery;
 
   console.log(`[JobController] Buscando: "${enrichedQuery}" | nivel: ${userExperienceLevel || 'N/A'}`);
 
+  const [adzunaUs, adzunaGb, remotiveJobs, jobicyJobs, joobleJobs, careerjetJobs] = await Promise.all([
+    fetchAdzuna(enrichedQuery, 'us', 1, 20).catch((e) => {
+      console.warn('[JobController] Adzuna US falló:', e.message);
+      return [];
+    }),
+    fetchAdzuna(enrichedQuery, 'gb', 1, 10).catch((e) => {
+      console.warn('[JobController] Adzuna GB falló:', e.message);
+      return [];
+    }),
+    fetchRemotive(finalQuery),
+    fetchJobicy(finalQuery),
+    fetchJoobleJobs(finalQuery),
+    fetchCareerjetJobs(finalQuery, requestMeta),
+  ]);
+
+  const queryWords = finalQuery.toLowerCase()
+    .split(/\s+/)
+    .filter((w) => w.length > 2 && !QUERY_STOP_WORDS.has(w));
+
+  const raw = [...adzunaUs, ...adzunaGb, ...remotiveJobs, ...jobicyJobs, ...joobleJobs, ...careerjetJobs]
+    .filter(isQualityJob)
+    .filter((j) => j.job_apply_link && j.job_title)
+    .filter((j) => isQueryRelevant(j, queryWords));
+
+  const dedupKey = (job) =>
+    `${(job.job_title || '').toLowerCase().trim()}|${(job.employer_name || '').toLowerCase().trim()}`;
+  const seen = new Set();
+  const sane = raw.filter((job) => {
+    const key = dedupKey(job);
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+  const afterExpFilter = strictExperienceFilter(sane, userExperienceLevel);
+  const pool = afterExpFilter.length >= 8 ? afterExpFilter : sane;
+
+  const tagged = pool.map((job) => ({
+    ...job,
+    _scope: job._scope || (isColombiaJob(job) ? 'colombia' : 'internacional'),
+  }));
+
+  console.log(`[JobController] "${enrichedQuery}" → AdzunaUS:${adzunaUs.length} AdzunaGB:${adzunaGb.length} Remotive:${remotiveJobs.length} Jobicy:${jobicyJobs.length} Jooble:${joobleJobs.length} CareerJet:${careerjetJobs.length} | raw:${raw.length} dedup:${sane.length} | tras filtro exp:${afterExpFilter.length} | pool final:${tagged.length}`);
+  setCache(cacheKey, tagged);
+  setDevCache(cacheKey, tagged);
+
+  const enrichedJobs = enrichJobsWithMatchData(tagged, userProfile || {});
+  enrichedJobs.sort((a, b) => {
+    const scoreA = (a.matchAnalysis?.score ?? 0) + (a._scope === 'colombia' ? 5 : 0);
+    const scoreB = (b.matchAnalysis?.score ?? 0) + (b._scope === 'colombia' ? 5 : 0);
+    return scoreB - scoreA;
+  });
+
+  const topJobs = enrichedJobs.slice(0, resultLimit);
+  return { jobs: topJobs, total: topJobs.length, cached: false, activeQuery: baseQuery };
+};
+
+/**
+ * GET /api/jobs/search
+ * Query params: query (string), location (string)
+ */
+export const searchJobs = async (req, res) => {
   try {
-    // Adzuna US + GB + Remotive + Jobicy + Jooble + CareerJet en paralelo
-    // US/GB: posiciones remotas accesibles desde Colombia
-    // Remotive/Jobicy/Jooble: empleos remotos globales, sin API key
-    // CareerJet: empleos presenciales/híbridos en Colombia
-    const [adzunaUs, adzunaGb, remotiveJobs, jobicyJobs, joobleJobs, careerjetJobs] = await Promise.all([
-      fetchAdzuna(enrichedQuery, 'us', 1, 20).catch((e) => {
-        console.warn('[JobController] Adzuna US falló:', e.message);
-        return [];
-      }),
-      fetchAdzuna(enrichedQuery, 'gb', 1, 10).catch((e) => {
-        console.warn('[JobController] Adzuna GB falló:', e.message);
-        return [];
-      }),
-      fetchRemotive(finalQuery),
-      fetchJobicy(finalQuery),
-      fetchJoobleJobs(finalQuery),
-      fetchCareerjetJobs(finalQuery, req),
-    ]);
-
-    // Palabras clave del query (sin stop words) para filtro de relevancia
-    const queryWords = finalQuery.toLowerCase()
-      .split(/\s+/)
-      .filter((w) => w.length > 2 && !QUERY_STOP_WORDS.has(w));
-
-    // ── Filtros de calidad ─────────────────────────────────────────────────────
-    const raw = [...adzunaUs, ...adzunaGb, ...remotiveJobs, ...jobicyJobs, ...joobleJobs, ...careerjetJobs]
-      .filter(isQualityJob)
-      .filter((j) => j.job_apply_link && j.job_title)
-      .filter((j) => isQueryRelevant(j, queryWords));
-
-    // ── Deduplicación: mismo título + misma empresa → conservar el primero ────
-    const dedupKey = (j) =>
-      `${(j.job_title || '').toLowerCase().trim()}|${(j.employer_name || '').toLowerCase().trim()}`;
-    const seen = new Set();
-    const sane = raw.filter((j) => {
-      const k = dedupKey(j);
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
+    const result = await searchJobsForUser({
+      userId: req.user?.userId,
+      query: req.query.query || '',
+      location: req.query.location || '',
+      requestMeta: req,
     });
-
-    // strictExperienceFilter aplica post-filtro por años solicitados en texto
-    const afterExpFilter = strictExperienceFilter(sane, userExperienceLevel);
-
-    // Si el filtro estricto dejó menos de 8 resultados, usamos el pool sin filtrar
-    const pool = afterExpFilter.length >= 8 ? afterExpFilter : sane;
-
-    const tagged = pool.map((job) => ({
-      ...job,
-      _scope: job._scope || (isColombiaJob(job) ? 'colombia' : 'internacional'),
-    }));
-
-    console.log(`[JobController] "${enrichedQuery}" → AdzunaUS:${adzunaUs.length} AdzunaGB:${adzunaGb.length} Remotive:${remotiveJobs.length} Jobicy:${jobicyJobs.length} Jooble:${joobleJobs.length} CareerJet:${careerjetJobs.length} | raw:${raw.length} dedup:${sane.length} | tras filtro exp:${afterExpFilter.length} | pool final:${tagged.length}`);
-    setCache(cacheKey, tagged);
-    setDevCache(cacheKey, tagged);
-
-    // Enriquecer con match score y ordenar por score.
-    // Los empleos colombianos reciben +5 pts de boost para competir con
-    // los internacionales en el top 10 global.
-    const enrichedJobs = enrichJobsWithMatchData(tagged, userProfile || {});
-    enrichedJobs.sort((a, b) => {
-      const scoreA = (a.matchAnalysis?.score ?? 0) + (a._scope === 'colombia' ? 5 : 0);
-      const scoreB = (b.matchAnalysis?.score ?? 0) + (b._scope === 'colombia' ? 5 : 0);
-      return scoreB - scoreA;
-    });
-
-    const top15 = enrichedJobs.slice(0, 15);
-    return res.status(200).json({ jobs: top15, total: top15.length, cached: false, activeQuery: baseQuery });
-
+    return res.status(200).json(result);
   } catch (error) {
     const status  = error.response?.status || 500;
     const message = error.response?.data?.message || error.message || 'Error al obtener ofertas';

@@ -7,6 +7,12 @@ import {
 } from 'lucide-react'
 import LogoNext from '../components/LogoNext'
 import axiosInstance from '../api/axiosInstance'
+import Seo from '../components/Seo'
+import {
+  getStoredUser,
+  mergeStoredUser,
+  SESSION_USER_UPDATED_EVENT,
+} from '../utils/sessionUser'
 
 const hasCompletedOnboarding = (profile) => {
   const skillsCount = Array.isArray(profile?.skills) ? profile.skills.length : 0
@@ -24,7 +30,7 @@ const CircularProgress = ({ percentage }) => {
   const offset = circ - (percentage / 100) * circ
 
   return (
-    <svg width="110" height="110" viewBox="0 0 100 100" className="flex-shrink-0">
+    <svg width="110" height="110" viewBox="0 0 100 100" className="shrink-0">
       <defs>
         <linearGradient id="scoreGrad" x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" stopColor="#1B49AE" />
@@ -72,7 +78,7 @@ const UserAvatar = ({ name, onLogout, onGoToProfile }) => {
     <div className="relative">
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-9 h-9 rounded-full bg-gradient-to-br from-[#1B49AE] to-[#22D3EE] flex items-center justify-center text-white text-xs font-bold cursor-pointer shadow-sm hover:opacity-90 transition-opacity"
+        className="w-9 h-9 rounded-full bg-linear-to-br from-[#1B49AE] to-next-secondary flex items-center justify-center text-white text-xs font-bold cursor-pointer shadow-sm hover:opacity-90 transition-opacity"
         aria-label="Menú de usuario"
       >
         {initials}
@@ -108,12 +114,12 @@ const UserAvatar = ({ name, onLogout, onGoToProfile }) => {
 const GrowthItem = ({ label, boost, onClick }) => (
   <button
     onClick={onClick}
-    className="flex items-center justify-between w-full px-4 py-3 rounded-xl border border-gray-100 bg-white hover:border-[#2563EB]/30 hover:bg-blue-50/40 transition-all duration-150 cursor-pointer group"
+    className="flex items-center justify-between w-full px-4 py-3 rounded-xl border border-gray-100 bg-white hover:border-next-primary/30 hover:bg-blue-50/40 transition-all duration-150 cursor-pointer group"
   >
     <span className="text-sm text-gray-700 font-medium">{label}</span>
     <div className="flex items-center gap-2">
-      <span className="text-xs font-semibold text-[#10B981] bg-green-50 px-2 py-0.5 rounded-full">{boost}</span>
-      <ChevronRight size={14} className="text-gray-300 group-hover:text-[#2563EB] transition-colors" />
+      <span className="text-xs font-semibold text-next-success bg-green-50 px-2 py-0.5 rounded-full">{boost}</span>
+      <ChevronRight size={14} className="text-gray-300 group-hover:text-next-primary transition-colors" />
     </div>
   </button>
 )
@@ -134,7 +140,7 @@ const Dashboard = () => {
     setLoadError(false)
     const session = localStorage.getItem('next_session')
     const token = localStorage.getItem('next_token')
-    const storedUser = JSON.parse(localStorage.getItem('next_user') || 'null')
+    const storedUser = getStoredUser()
     const cachedProfile = JSON.parse(localStorage.getItem('next_profile') || 'null')
     const onboardingCompleted = localStorage.getItem('next_onboarding_completed') === 'true'
 
@@ -148,6 +154,11 @@ const Dashboard = () => {
     try {
       const response = await axiosInstance.get('/user/profile', { timeout: 15000 })
       const dbProfile = response.data
+      const syncedUser = mergeStoredUser({
+        name: dbProfile.name || storedUser?.name || 'Usuario',
+        email: dbProfile.email || storedUser?.email || '',
+        profilePicture: dbProfile.profilePicture || null,
+      })
 
       if (hasCompletedOnboarding(dbProfile)) {
         localStorage.setItem('next_onboarding_completed', 'true')
@@ -164,6 +175,7 @@ const Dashboard = () => {
         return
       }
 
+      setUser(syncedUser)
       setProfile(dbProfile)
       setScore(dbProfile.score || 0)
 
@@ -196,6 +208,17 @@ const Dashboard = () => {
     }
     checkAuthAndFetchProfile()
   }, [navigate])
+
+  useEffect(() => {
+    const handleUserUpdate = (event) => {
+      if (event.detail) {
+        setUser(event.detail)
+      }
+    }
+
+    window.addEventListener(SESSION_USER_UPDATED_EVENT, handleUserUpdate)
+    return () => window.removeEventListener(SESSION_USER_UPDATED_EVENT, handleUserUpdate)
+  }, [])
 
   // ── Animación dinámica del score (tanto al subir como al bajar) ──────────
   useEffect(() => {
@@ -243,7 +266,7 @@ const Dashboard = () => {
           <p className="text-gray-500 text-sm">No se pudo cargar tu perfil. El servidor puede estar iniciando.</p>
           <button
             onClick={loadProfile}
-            className="px-5 py-2.5 bg-[#2563EB] text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors cursor-pointer"
+            className="px-5 py-2.5 bg-next-primary text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-colors cursor-pointer"
           >
             Reintentar
           </button>
@@ -274,11 +297,18 @@ const Dashboard = () => {
     )
   }
 
-  const firstName = user.name ? user.name.split(' ')[0] : 'Usuario'
+  const displayName = profile?.name || user?.name || 'Usuario'
+  const firstName = displayName ? displayName.split(' ')[0] : 'Usuario'
   const skillsArray = profile?.skills || []
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC]">
+    <div className="min-h-screen bg-next-gray">
+      <Seo
+        title={`Dashboard | ${displayName} | Next Job Hunter`}
+        description="Panel privado de Next Job Hunter para gestionar tu perfil, CV y herramientas de empleabilidad."
+        path="/dashboard"
+        robots="noindex, nofollow"
+      />
 
       {/* ════════════════════════════════════════════════════
                 NAV — Logo + Acciones
@@ -293,11 +323,11 @@ const Dashboard = () => {
               className="relative w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors cursor-pointer"
             >
               <Bell size={18} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#2563EB] rounded-full ring-2 ring-white" />
+              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-next-primary rounded-full ring-2 ring-white" />
             </button>
 
             <UserAvatar
-              name={user.name}
+              name={displayName}
               onLogout={handleLogout}
               onGoToProfile={() => navigate('/profile')}
             />
@@ -325,7 +355,7 @@ const Dashboard = () => {
               {skillsArray.slice(0, 6).map(skill => (
                 <span
                   key={skill}
-                  className="px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-[#2563EB] border border-blue-100"
+                  className="px-3 py-1 rounded-full text-xs font-medium bg-blue-50 text-next-primary border border-blue-100"
                 >
                   {skill}
                 </span>
@@ -346,7 +376,7 @@ const Dashboard = () => {
           <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)] animate-fade-in-up">
             <div className="flex items-start justify-between mb-4">
               <h2 className="font-bold text-gray-900">Nivel de empleabilidad</h2>
-              <button className="flex items-center gap-1 text-xs text-gray-400 border border-gray-200 rounded-full px-3 py-1 hover:border-[#2563EB] hover:text-[#2563EB] transition-all cursor-pointer">
+              <button className="flex items-center gap-1 text-xs text-gray-400 border border-gray-200 rounded-full px-3 py-1 hover:border-next-primary hover:text-next-primary transition-all cursor-pointer">
                 <HelpCircleIcon /> ¿Cómo se calcula?
               </button>
             </div>
@@ -360,8 +390,8 @@ const Dashboard = () => {
                   y tus metas laborales.
                 </p>
                 <div className="flex items-center gap-1.5 mt-3">
-                  <TrendingUp size={13} className="text-[#10B981]" />
-                  <span className="text-xs text-[#10B981] font-semibold">
+                  <TrendingUp size={13} className="text-next-success" />
+                  <span className="text-xs text-next-success font-semibold">
                     {score < 60 ? 'En construcción' : score < 80 ? 'Perfil competitivo' : '¡Perfil destacado!'}
                   </span>
                 </div>
@@ -373,7 +403,7 @@ const Dashboard = () => {
           <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)] flex items-center justify-between gap-4 animate-fade-in-up">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1.5">
-                <FileText size={18} className="text-[#10B981]" />
+                <FileText size={18} className="text-next-success" />
                 <h2 className="font-bold text-gray-900">CV Maker</h2>
               </div>
               <p className="text-sm text-gray-500 mb-4 leading-relaxed">
@@ -388,8 +418,8 @@ const Dashboard = () => {
               </Link>
             </div>
 
-            <div className="hidden sm:flex w-20 h-20 rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 items-center justify-center flex-shrink-0">
-              <FileText size={38} className="text-[#10B981] opacity-80" />
+            <div className="hidden sm:flex w-20 h-20 rounded-2xl bg-linear-to-br from-emerald-50 to-teal-50 border border-emerald-100 items-center justify-center shrink-0">
+              <FileText size={38} className="text-next-success opacity-80" />
             </div>
           </div>
         </div>
@@ -401,7 +431,7 @@ const Dashboard = () => {
           <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)] flex items-center justify-between gap-4 animate-fade-in-up">
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1.5">
-                <Bot size={18} className="text-[#2563EB]" />
+                <Bot size={18} className="text-next-primary" />
                 <h2 className="font-bold text-gray-900">IA Coach</h2>
               </div>
               <p className="text-sm text-gray-500 mb-4 leading-relaxed">
@@ -417,8 +447,8 @@ const Dashboard = () => {
             </div>
 
             {/* Ilustración del robot */}
-            <div className="hidden sm:flex w-20 h-20 rounded-2xl bg-gradient-to-br from-blue-50 to-cyan-50 border border-blue-100 items-center justify-center flex-shrink-0">
-              <Bot size={38} className="text-[#2563EB] opacity-80" />
+            <div className="hidden sm:flex w-20 h-20 rounded-2xl bg-linear-to-br from-blue-50 to-cyan-50 border border-blue-100 items-center justify-center shrink-0">
+              <Bot size={38} className="text-next-primary opacity-80" />
             </div>
           </div>
 
@@ -441,7 +471,7 @@ const Dashboard = () => {
               </Link>
             </div>
 
-            <div className="hidden sm:flex w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-50 to-violet-50 border border-purple-100 items-center justify-center flex-shrink-0">
+            <div className="hidden sm:flex w-20 h-20 rounded-2xl bg-linear-to-br from-purple-50 to-violet-50 border border-purple-100 items-center justify-center shrink-0">
               <Briefcase size={38} className="text-[#8B5CF6] opacity-80" />
             </div>
           </div>
@@ -450,8 +480,8 @@ const Dashboard = () => {
         {/* ── Portfolio Web Banner ───────────── */}
         <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-[0_2px_12px_rgba(0,0,0,0.04)] flex items-center justify-between gap-4 animate-fade-in-up">
           <div className="flex items-center gap-4 flex-1 min-w-0">
-            <div className="hidden sm:flex w-12 h-12 rounded-xl bg-[#EFF6FF] border border-[#BFDBFE] items-center justify-center flex-shrink-0">
-              <Globe size={22} className="text-[#2563EB]" />
+            <div className="hidden sm:flex w-12 h-12 rounded-xl bg-[#EFF6FF] border border-[#BFDBFE] items-center justify-center shrink-0">
+              <Globe size={22} className="text-next-primary" />
             </div>
             <div className="min-w-0">
               <p className="font-bold text-gray-900 text-sm mb-0.5">Portfolio Web — Nuevo</p>
@@ -462,7 +492,7 @@ const Dashboard = () => {
           </div>
           <Link
             to="/portfolio"
-            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] flex-shrink-0"
+            className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-white transition-all hover:opacity-90 hover:scale-[1.02] active:scale-[0.98] shrink-0"
             style={{ background: 'linear-gradient(to right, #1D4ED8, #2563EB)' }}
           >
             Generar <ChevronRight size={14} />

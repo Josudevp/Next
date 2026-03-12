@@ -36,6 +36,32 @@ const safeParseJSON = (data) => {
     return data || [];
 };
 
+const parseOptionalBoolean = (value) => {
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'string') {
+        const normalized = value.trim().toLowerCase();
+        if (normalized === 'true') return true;
+        if (normalized === 'false') return false;
+    }
+    return undefined;
+};
+
+const serializeUserProfile = (user) => ({
+    id: user.id,
+    name: user.name,
+    email: user.email,
+    score: user.score,
+    area: user.area || '',
+    skills: safeParseJSON(user.skills),
+    goals: safeParseJSON(user.goals),
+    jobType: user.jobType || '',
+    experienceLevel: user.experienceLevel || 'Sin experiencia',
+    hunterNotificationsEnabled: user.hunterNotificationsEnabled !== false,
+    hunterLastNotifiedAt: user.hunterLastNotifiedAt || null,
+    profilePicture: user.profilePicture || null,
+    hasCv: !!user.cvText,
+});
+
 // Función interna para calcular el score de empleabilidad
 const calculateScore = (area, skills = [], goals = []) => {
     let newScore = 0;
@@ -76,20 +102,7 @@ export const getProfile = async (req, res) => {
             return res.status(404).json({ mensaje: 'Usuario no encontrado' });
         }
 
-        // Devolvemos las propiedades parseadas para asegurar que sean Array
-        res.json({
-            id: user.id,
-            name: user.name,
-            email: user.email,
-            score: user.score,
-            area: user.area || '',
-            skills: safeParseJSON(user.skills),
-            goals: safeParseJSON(user.goals),
-            jobType: user.jobType || '',
-            experienceLevel: user.experienceLevel || 'Sin experiencia',
-            profilePicture: user.profilePicture || null,
-            hasCv: !!user.cvText
-        });
+        res.json(serializeUserProfile(user));
 
     } catch (error) {
         console.error('Error al obtener el perfil:', error);
@@ -101,7 +114,7 @@ export const getProfile = async (req, res) => {
 export const updateProfile = async (req, res) => {
     try {
         const userId = req.user.userId;
-        const { area, skills, goals, jobType, experienceLevel } = req.body;
+        const { name, area, skills, goals, jobType, experienceLevel, hunterNotificationsEnabled } = req.body;
 
         // Asegurarse de que vengan como arreglos o se puedan mapear, la BD (JSON en sequelize/mysql) lo manejará
         const parsedSkills = Array.isArray(skills) ? skills : [];
@@ -111,14 +124,25 @@ export const updateProfile = async (req, res) => {
         const newScore = calculateScore(area, parsedSkills, parsedGoals);
 
         // Actualizar en BD
-        await User.update({
+        const updateData = {
             area: area || null,
             skills: parsedSkills,
             goals: parsedGoals,
             jobType: jobType || null,
             experienceLevel: experienceLevel || 'Sin experiencia',
             score: newScore
-        }, {
+        };
+
+        const parsedHunterNotificationsEnabled = parseOptionalBoolean(hunterNotificationsEnabled);
+        if (parsedHunterNotificationsEnabled !== undefined) {
+            updateData.hunterNotificationsEnabled = parsedHunterNotificationsEnabled;
+        }
+
+        if (name && name.trim()) {
+            updateData.name = name.trim();
+        }
+
+        await User.update(updateData, {
             where: { id: userId }
         });
 
@@ -127,22 +151,9 @@ export const updateProfile = async (req, res) => {
             attributes: { exclude: ['password'] }
         });
 
-        // Retornar al frontend asegurando que parseamos los campos si el backend los casteó a string
-        const userToReturn = {
-            id: updatedUser.id,
-            name: updatedUser.name,
-            email: updatedUser.email,
-            score: updatedUser.score,
-            area: updatedUser.area || '',
-            skills: safeParseJSON(updatedUser.skills),
-            goals: safeParseJSON(updatedUser.goals),
-            jobType: updatedUser.jobType || '',
-            experienceLevel: updatedUser.experienceLevel || 'Sin experiencia'
-        };
-
         res.json({
             mensaje: '¡Perfil actualizado exitosamente!',
-            user: userToReturn
+            user: serializeUserProfile(updatedUser)
         });
 
     } catch (error) {
@@ -157,9 +168,10 @@ export const uploadProfile = async (req, res) => {
         const userId = req.user.userId;
 
         // Campos de texto (vienen en req.body cuando el content-type es multipart)
-        const { name, area, skills, goals, jobType, experienceLevel } = req.body;
+        const { name, area, skills, goals, jobType, experienceLevel, hunterNotificationsEnabled } = req.body;
         const parsedSkills = safeParseJSON(skills) ;
         const parsedGoals  = safeParseJSON(goals);
+        const parsedHunterNotificationsEnabled = parseOptionalBoolean(hunterNotificationsEnabled);
 
         const updateData = {
             area:            area            || null,
@@ -169,6 +181,10 @@ export const uploadProfile = async (req, res) => {
             experienceLevel: experienceLevel || 'Sin experiencia',
             score:           calculateScore(area, parsedSkills, parsedGoals),
         };
+
+        if (parsedHunterNotificationsEnabled !== undefined) {
+            updateData.hunterNotificationsEnabled = parsedHunterNotificationsEnabled;
+        }
 
         // Nombre — solo actualizamos si viene explícitamente
         if (name && name.trim()) updateData.name = name.trim();
@@ -202,27 +218,63 @@ export const uploadProfile = async (req, res) => {
 
         await User.update(updateData, { where: { id: userId } });
 
-        const updatedUser = await User.findByPk(userId, { attributes: { exclude: ['password', 'cvText'] } });
+        const updatedUser = await User.findByPk(userId, { attributes: { exclude: ['password'] } });
 
         return res.json({
             mensaje: '¡Perfil actualizado exitosamente!',
-            user: {
-                id:              updatedUser.id,
-                name:            updatedUser.name,
-                email:           updatedUser.email,
-                score:           updatedUser.score,
-                area:            updatedUser.area            || '',
-                skills:          safeParseJSON(updatedUser.skills),
-                goals:           safeParseJSON(updatedUser.goals),
-                jobType:         updatedUser.jobType         || '',
-                experienceLevel: updatedUser.experienceLevel || 'Sin experiencia',
-                profilePicture:  updatedUser.profilePicture  || null,
-                hasCv:           !!updatedUser.cvText,
-            }
+            user: serializeUserProfile(updatedUser)
         });
 
     } catch (error) {
         console.error('Error en uploadProfile:', error);
         res.status(500).json({ mensaje: 'Error interno del servidor al actualizar perfil' });
+    }
+};
+
+export const deleteProfilePicture = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+
+        await User.update({ profilePicture: null }, { where: { id: userId } });
+
+        const updatedUser = await User.findByPk(userId, {
+            attributes: { exclude: ['password'] }
+        });
+
+        if (!updatedUser) {
+            return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+        }
+
+        return res.json({
+            mensaje: 'Foto de perfil eliminada correctamente.',
+            user: serializeUserProfile(updatedUser)
+        });
+    } catch (error) {
+        console.error('Error al eliminar la foto de perfil:', error);
+        return res.status(500).json({ mensaje: 'No se pudo eliminar la foto de perfil.' });
+    }
+};
+
+export const deleteCv = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+
+        await User.update({ cvText: null }, { where: { id: userId } });
+
+        const updatedUser = await User.findByPk(userId, {
+            attributes: { exclude: ['password'] }
+        });
+
+        if (!updatedUser) {
+            return res.status(404).json({ mensaje: 'Usuario no encontrado' });
+        }
+
+        return res.json({
+            mensaje: 'CV eliminado correctamente.',
+            user: serializeUserProfile(updatedUser)
+        });
+    } catch (error) {
+        console.error('Error al eliminar el CV:', error);
+        return res.status(500).json({ mensaje: 'No se pudo eliminar el CV.' });
     }
 };

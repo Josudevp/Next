@@ -130,3 +130,26 @@ Campo agregado para personalizar la experiencia del usuario según su trayectori
     - La dificultad de las preguntas en simulaciones de entrevista.
     - La profundidad y complejidad de los consejos laborales.
     - Las expectativas según el nivel del candidato.
+
+---
+
+## 🔔 Fase 3: Retención (Hunter Notifications)
+
+Se agregó la base backend para retención proactiva del usuario en Job Hunter.
+
+### Qué hace
+- Ejecuta un digest diario por correo con nuevas vacantes relevantes para cada usuario.
+- Reutiliza el mismo motor de búsqueda y scoring de Job Hunter para no divergir entre web y correo.
+- Evita reenviar vacantes ya notificadas guardando IDs vistos por usuario.
+
+### Componentes nuevos
+- `backend/services/hunterNotificationService.js`: arma el digest diario y envía correos con Brevo.
+- `backend/scripts/runHunterDigest.js`: runner aislado para ejecutar el proceso sin levantar Express.
+- `backend/migrations/add-hunter-notification-fields.js`: agrega columnas de activación, última notificación y vacantes vistas.
+- `render.yaml`: define un servicio `cron` diario a las `12:00 UTC` (`7:00 a. m. Colombia`).
+
+### Operación
+1. Ejecutar la migración: `npm run migrate:hunter-notifications`
+2. Desplegar backend + cron en Render.
+3. Cada mañana el cron busca vacantes nuevas para usuarios con `hunterNotificationsEnabled = true`.
+4. Si hay matches nuevos con score útil, envía un resumen por correo y actualiza el historial.

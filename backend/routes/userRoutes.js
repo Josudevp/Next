@@ -1,5 +1,12 @@
 import express from 'express';
-import { getProfile, updateProfile, uploadProfile, uploadMiddleware } from '../controllers/userController.js';
+import {
+	deleteCv,
+	deleteProfilePicture,
+	getProfile,
+	updateProfile,
+	uploadProfile,
+	uploadMiddleware,
+} from '../controllers/userController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -15,5 +22,9 @@ router.put('/update', updateProfile);
 
 // Endpoint PUT para subir foto + CV + datos del perfil (multipart/form-data)
 router.put('/profile', uploadMiddleware, uploadProfile);
+
+// Endpoints DELETE para limpiar activos del perfil
+router.delete('/profile/picture', deleteProfilePicture);
+router.delete('/profile/cv', deleteCv);
 
 export default router;

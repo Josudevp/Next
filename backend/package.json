@@ -6,6 +6,8 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
+    "digest:hunter": "node scripts/runHunterDigest.js",
+    "migrate:hunter-notifications": "node migrations/add-hunter-notification-fields.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

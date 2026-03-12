@@ -60,6 +60,19 @@ const User = sequelize.define('User', {
   resetPasswordExpires: {
     type: DataTypes.DATE,
     allowNull: true
+  },
+  hunterNotificationsEnabled: {
+    type: DataTypes.BOOLEAN,
+    allowNull: false,
+    defaultValue: true
+  },
+  hunterLastNotifiedAt: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  hunterSeenJobIds: {
+    type: DataTypes.JSON,
+    allowNull: true
   }
 });
 

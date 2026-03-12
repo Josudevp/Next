@@ -3,6 +3,16 @@ import Robot3D from '../components/Robot3D'
 import SecundaryBtn from '../components/SecundaryBtn'
 import Button from '../components/Button'
 import LogoNext from '../components/LogoNext'
+import Seo from '../components/Seo'
+
+const homeStructuredData = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'Next Job Hunter',
+    url: 'https://next-frontend.onrender.com/',
+    description: 'Plataforma con IA para crear CV, practicar entrevistas y encontrar el primer empleo.',
+    inLanguage: 'es-CO',
+}
 
 const Home = () => {
 
@@ -17,7 +27,15 @@ const Home = () => {
     }
 
     return (
-        <main className='relative min-h-dvh overflow-hidden bg-linear-to-b from-[#EFEFEF] via-[#DCE5F3] to-[#8DA8D8] px-5 py-4 sm:px-6 md:h-dvh md:px-10 md:py-6 lg:px-16'>
+        <>
+            <Seo
+                title='Next Job Hunter | IA para CV, entrevistas y primer empleo'
+                description='Next Job Hunter transforma tu perfil en una marca profesional con IA: crea tu CV, practica entrevistas y encuentra mejores oportunidades.'
+                keywords='Next Job Hunter, IA para empleo, creador de CV, entrevistas con IA, primer empleo, empleabilidad'
+                path='/'
+                structuredData={homeStructuredData}
+            />
+            <main className='relative min-h-dvh overflow-hidden bg-linear-to-b from-[#EFEFEF] via-[#DCE5F3] to-[#8DA8D8] px-5 py-4 sm:px-6 md:h-dvh md:px-10 md:py-6 lg:px-16'>
             {/* Logo - Always Top Left */}
             <nav className='absolute top-4 left-5 z-20 sm:left-6 md:top-6 md:left-16'>
                 <LogoNext />
@@ -25,8 +43,8 @@ const Home = () => {
 
             {/* BETA badge */}
             <div className='absolute top-4 right-5 z-20 sm:right-6 md:top-6 md:right-10 lg:right-16'>
-                <span className='inline-flex items-center gap-1.5 bg-[#2563EB]/10 border border-[#2563EB]/30 text-[#2563EB] text-[11px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full'>
-                    <span className='w-1.5 h-1.5 rounded-full bg-[#2563EB] animate-pulse' />
+                <span className='inline-flex items-center gap-1.5 bg-next-primary/10 border border-next-primary/30 text-next-primary text-[11px] font-bold uppercase tracking-widest px-3 py-1.5 rounded-full'>
+                    <span className='w-1.5 h-1.5 rounded-full bg-next-primary animate-pulse' />
                     Beta
                 </span>
             </div>
@@ -69,7 +87,8 @@ const Home = () => {
                     </div>
                 </section>
             </div>
-        </main>
+            </main>
+        </>
     )
 }
 export default Home

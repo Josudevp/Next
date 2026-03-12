@@ -6,6 +6,7 @@ import {
 } from 'lucide-react'
 import axiosInstance from '../api/axiosInstance'
 import LogoNext from '../components/LogoNext'
+import Seo from '../components/Seo'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -106,7 +107,7 @@ const JobCard = ({ job }) => {
 
         <div className="flex flex-col items-end gap-2 shrink-0">
           {match && (
-            <div className={`min-w-[104px] rounded-2xl border px-3 py-2 ${matchTone.shell}`}>
+            <div className={`min-w-26 rounded-2xl border px-3 py-2 ${matchTone.shell}`}>
               <div className="flex items-baseline justify-between gap-2">
                 <span className="text-[10px] font-semibold uppercase tracking-[0.12em]">IA Match</span>
                 <span className="text-lg font-black leading-none">{match.score}%</span>
@@ -385,6 +386,12 @@ const JobHunter = () => {
 
   return (
     <div className="min-h-screen bg-next-gray">
+      <Seo
+        title="Job Hunter | Vacantes con IA | Next Job Hunter"
+        description="Explora vacantes filtradas con IA dentro de Next Job Hunter."
+        path="/job-hunter"
+        robots="noindex, nofollow"
+      />
 
       {/* ════════════════ NAV ════════════════ */}
       <nav className="bg-white border-b border-gray-100 sticky top-0 z-40 shadow-[0_1px_3px_rgba(0,0,0,0.04)]">
