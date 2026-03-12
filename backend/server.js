@@ -4,6 +4,7 @@ dotenv.config();
 import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
+import cron from 'node-cron';
 import sequelize from './config/db.js';
 import './models/User.js';
 import './models/Message.js'; // Registra el modelo y define la asociación User → Message
@@ -100,6 +101,24 @@ const server = app.listen(PORT, () => {
   console.log(`🚀 Servidor de NEXT corriendo en puerto ${PORT} [${process.env.NODE_ENV || 'development'}]`);
   // Warm up Chromium in the background so first PDF export is fast
   warmBrowser();
+
+  // ── Digest diario de vacantes ─────────────────────────────────────────────
+  // 0 12 * * *  →  12:00 UTC = 7:00 AM Colombia (UTC-5)
+  // Solo activo en producción para evitar correos accidentales en local.
+  if (process.env.NODE_ENV === 'production') {
+    import('./services/hunterNotificationService.js').then(({ runHunterDigest }) => {
+      cron.schedule('0 12 * * *', async () => {
+        console.log('[digest] 🔔 Iniciando digest diario de vacantes...');
+        try {
+          await runHunterDigest();
+          console.log('[digest] ✅ Digest completado.');
+        } catch (err) {
+          console.error('[digest] ❌ Error en el digest:', err.message);
+        }
+      }, { timezone: 'UTC' });
+      console.log('[digest] ⏰ Cron programado — 12:00 UTC diario');
+    });
+  }
 });
 
 // Keep connections alive through Render's 60-second proxy timeout.

@@ -30,34 +30,6 @@ services:
       - key: BREVO_API_KEY
         sync: false
 
-  - type: cron
-    name: next-hunter-notifications
-    runtime: node
-    branch: main
-    rootDir: backend
-    buildCommand: npm install
-    startCommand: npm run digest:hunter
-    schedule: "0 12 * * *"
-    envVars:
-      - key: NODE_ENV
-        value: production
-      - key: DATABASE_URL
-        sync: false
-      - key: FRONTEND_URL
-        value: https://next-col.online
-      - key: EMAIL_USER
-        sync: false
-      - key: BREVO_API_KEY
-        sync: false
-      - key: ADZUNA_APP_ID
-        sync: false
-      - key: ADZUNA_APP_KEY
-        sync: false
-      - key: JOOBLE_API_KEY
-        sync: false
-      - key: CAREERJET_AFFID
-        sync: false
-
   # 2. LA CARA (FRONTEND)
   - type: web
     name: next-frontend
