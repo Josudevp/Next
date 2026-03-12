@@ -5,6 +5,7 @@ services:
     runtime: node
     plan: free
     region: oregon
+    branch: main
     rootDir: backend
     buildCommand: npm install
     startCommand: node server.js
@@ -33,6 +34,7 @@ services:
     name: next-hunter-notifications
     runtime: node
     plan: free
+    branch: main
     rootDir: backend
     buildCommand: npm install
     startCommand: npm run digest:hunter
@@ -61,6 +63,7 @@ services:
   - type: web
     name: next-frontend
     runtime: static
+    branch: main
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist
