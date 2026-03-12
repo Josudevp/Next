@@ -33,7 +33,6 @@ services:
   - type: cron
     name: next-hunter-notifications
     runtime: node
-    plan: free
     branch: main
     rootDir: backend
     buildCommand: npm install
