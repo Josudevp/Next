@@ -5,9 +5,6 @@ import Message from '../models/Message.js';
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
-// ── Áreas con perfil tecnológico (piden GitHub / Portafolio) ───────────────
-const TECH_AREAS = new Set(['tech', 'engineering', 'science', 'design']);
-
 // ── Catálogo de etiquetas legibles ──────────
 const AREA_LABELS = {
     tech: 'Tecnología e Informática',
@@ -71,8 +68,20 @@ const buildDynamicSystemPrompt = async (userId, isInterviewMode, isFirstMessage 
         const goalsList = Array.isArray(user.goals) && user.goals.length > 0
             ? user.goals.map(g => GOAL_LABELS[g] || g).join(', ')
             : 'sin metas específicas aún';
-        const cvBlock = user.cvText
-            ? `\n\n                    CV DEL CANDIDATO (texto extraído automáticamente):\n                    ---\n                    ${user.cvText.slice(0, 8000)}\n                    ---\n                    Usa este CV para personalizar tus preguntas. Puedes hacer referencia a experiencias, empresas o proyectos mencionados en él.`
+        // Extraer texto legible del cvText (puede ser JSON estructurado o texto plano)
+        let cvSnippet = '';
+        if (user.cvText) {
+            try {
+                const parsed = JSON.parse(user.cvText);
+                cvSnippet = parsed.rawText || JSON.stringify(parsed, null, 2);
+            } catch {
+                cvSnippet = user.cvText;
+            }
+            cvSnippet = cvSnippet.slice(0, 8000);
+        }
+
+        const cvBlock = cvSnippet
+            ? `\n\n                    CV DEL CANDIDATO (texto extraído automáticamente):\n                    ---\n                    ${cvSnippet}\n                    ---\n                    Usa este CV para personalizar tus preguntas. Puedes hacer referencia a experiencias, empresas o proyectos mencionados en él.`
             : '';
 
         if (isInterviewMode) {
@@ -124,7 +133,7 @@ const buildDynamicSystemPrompt = async (userId, isInterviewMode, isFirstMessage 
 
                 Eres el IA Coach de NEXT, una plataforma de empleabilidad. Hoy es ${todayDate}.
                 Hablas con ${user.name} (Área: ${areaLabel}, Skills: ${skills}, Metas: ${goalsList}, Tipo de trabajo buscado: ${jobTypeLabel}, Nivel de experiencia: ${experienceLevelLabel}).
-                ${cvBlock ? `\n                CONTEXTO DEL CV DEL USUARIO:\n                ---\n                ${user.cvText.slice(0, 8000)}\n                ---\n                Usa este CV para personalizar tus consejos, identificar brechas de habilidades y hacer referencias concretas a su experiencia real.` : ''}
+                ${cvSnippet ? `\n                CONTEXTO DEL CV DEL USUARIO:\n                ---\n                ${cvSnippet}\n                ---\n                Usa este CV para personalizar tus consejos, identificar brechas de habilidades y hacer referencias concretas a su experiencia real.` : ''}
 
                 IMPORTANTE: Ten en cuenta que el usuario tiene ${experienceLevelLabel}. Ajusta la dificultad de tus consejos laborales, explicaciones técnicas y recomendaciones a este nivel exacto. Si es alguien sin experiencia, sé más pedagógico y básico; si tiene más experiencia, asume conocimientos previos y profundiza más.
 
@@ -211,16 +220,11 @@ const buildCvGenerationPrompt = async (userId, isFirstMessage = false, templateI
 
         if (!user) throw new Error('Usuario no encontrado');
 
-        const isTechArea = TECH_AREAS.has(user.area);
         const areaLabel = AREA_LABELS[user.area] || user.area || 'área no especificada';
 
-        const contactDataBlock = isTechArea
-            ? `   - Nombre completo\n   - Teléfono/Celular\n   - LinkedIn (URL o usuario)\n   - GitHub (URL o usuario)\n   - Portafolio web (URL, si tiene)`
-            : `   - Nombre completo\n   - Teléfono/Celular\n   - LinkedIn (URL o usuario)`;
+        const contactDataBlock = `   - Nombre completo\n   - Teléfono/Celular\n   - LinkedIn (URL o usuario)\n   - GitHub (URL o usuario, opcional; si no aplica puede responder NO)\n   - Portafolio web (URL)`;
 
-        const jsonContactExtra = isTechArea
-            ? `    "github": "...",\n    "portfolio": "...",`
-            : '';
+        const jsonContactExtra = `    "github": "...",\n    "portfolio": "...",`;
 
         const stateRule = isFirstMessage
             ? `ESTADO ACTUAL — PRIMER TURNO: Saluda brevemente en una sola frase y pregunta si desea activar el Modo de Creación Asistida. No hagas ninguna otra pregunta todavía.`
@@ -298,6 +302,7 @@ Para Perfil Profesional, Experiencia y Habilidades:
 - UNA sola pregunta por turno. Sin excepciones.
 - Si el usuario no tiene algún dato, acéptalo y avanza.
 - Si una respuesta es ambigua, pide una sola aclaración.
+- Al preguntar por GitHub usa esta frase exacta o una equivalente muy cercana: "¿Te gustaría añadir un perfil de GitHub? Es una web muy famosa entre desarrolladores; si no eres uno, solo responde NO.".
 - Sé conversacional y breve.
 
 ━━━ SINCRONIZACIÓN DE VISTA PREVIA EN TIEMPO REAL ━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -356,6 +361,7 @@ REGLAS DEL JSON:
 - "skills.technical" y "skills.soft" deben ser arrays, nunca texto plano.
 - "languages" debe ser un array de objetos con "language" y "level". Si no hay idiomas usa [].
 - "personalReferences" y "familyReferences" deben ser arrays. Si no hay referencias usa [].
+- Si el usuario responde NO a GitHub, guarda "github" como "" o "NO".
 
 ${stateRule}`;
     } catch (error) {

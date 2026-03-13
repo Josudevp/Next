@@ -1,6 +1,51 @@
 import multer from 'multer';
 import { PDFParse } from 'pdf-parse';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import User from '../models/User.js';
+
+const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
+
+// ── Convierte texto plano de un CV en el JSON estructurado que usa el portfolio ──
+const parseCvTextToJson = async (plainText) => {
+    const model = genAI.getGenerativeModel(
+        { model: 'gemini-2.5-flash', generationConfig: { temperature: 0.2, maxOutputTokens: 4096 } },
+        { apiVersion: 'v1beta' }
+    );
+    const prompt = `Eres un parser de CVs. A partir del siguiente texto extraído de un PDF, genera un objeto JSON estructurado con EXACTAMENTE estos campos (usa null o [] si no encuentras el dato):
+
+{
+  "personalInfo": {
+    "name": "Nombre completo",
+    "phone": "Teléfono",
+    "email": "Correo",
+    "linkedin": "URL LinkedIn",
+    "github": "URL GitHub o usuario",
+    "portfolio": "URL portafolio web",
+    "address": "Ciudad o dirección"
+  },
+  "summary": "Perfil profesional o resumen (2-3 oraciones)",
+  "education": [{ "institution": "", "degree": "", "dates": "", "description": "" }],
+  "experience": [{ "company": "", "position": "", "dates": "", "description": "", "projectLabel": false }],
+  "skills": { "technical": [], "soft": [] },
+  "languages": [{ "language": "", "level": "" }],
+  "personalReferences": [],
+  "familyReferences": [],
+  "hasExperience": true,
+  "rawText": "TEXTO_PLANO_AQUI"
+}
+
+Pon el texto plano original en el campo "rawText" (truncado a 8000 caracteres).
+Responde ÚNICAMENTE con el JSON, sin explicaciones, sin markdown, sin bloques de código.
+
+TEXTO DEL CV:
+${plainText.slice(0, 12000)}`;
+
+    const result = await model.generateContent(prompt);
+    const raw = result.response.text().trim();
+    // Puede venir con ```json ... ``` — limpiar si es el caso
+    const cleaned = raw.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
+    return JSON.parse(cleaned);
+};
 
 // ── Multer: memoria para ambos archivos ──────────────────────────────────────
 // No guardamos el PDF en disco; solo extraemos el texto.
@@ -196,16 +241,25 @@ export const uploadProfile = async (req, res) => {
             updateData.profilePicture = `data:${avatarFile.mimetype};base64,${base64}`;
         }
 
-        // ── CV en PDF → extraer texto ───────────────────────────────────────
+        // ── CV en PDF → extraer texto → estructurar con IA ─────────────────
         if (req.files?.cv?.[0]) {
             let parser;
             try {
                 parser = new PDFParse({ data: req.files.cv[0].buffer });
                 const pdfData = await parser.getText();
+                const plainText = pdfData.text.trim().slice(0, 15000);
+                console.log(`[uploadProfile] CV procesado — ${plainText.length} caracteres extraídos`);
 
-                // Limitar a 15.000 caracteres para no saturar el prompt de Gemini
-                updateData.cvText = pdfData.text.trim().slice(0, 15000);
-                console.log(`[uploadProfile] CV procesado — ${updateData.cvText.length} caracteres extraídos`);
+                // Intentar estructurar el texto con Gemini para que el portfolio pueda usarlo
+                try {
+                    const structured = await parseCvTextToJson(plainText);
+                    updateData.cvText = JSON.stringify(structured);
+                    console.log('[uploadProfile] CV estructurado con IA correctamente');
+                } catch (aiErr) {
+                    // Si la IA falla, guardar el texto plano como fallback (el coach lo usa igual)
+                    console.warn('[uploadProfile] No se pudo estructurar el CV con IA, guardando texto plano:', aiErr.message);
+                    updateData.cvText = plainText;
+                }
             } catch (pdfErr) {
                 console.error('[uploadProfile] Error al parsear PDF:', pdfErr.message);
                 return res.status(422).json({ mensaje: 'No se pudo leer el PDF. Asegúrate de que no esté protegido con contraseña.' });
