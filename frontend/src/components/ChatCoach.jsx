@@ -220,6 +220,11 @@ const ChatCoach = () => {
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
             }
+            // Detener el audio de Google TTS si está sonando
+            if (audioRef.current) {
+                audioRef.current.pause();
+                audioRef.current.src = '';
+            }
             // Detener el reconocimiento de voz si está activo
             if (recognitionRef.current) {
                 recognitionRef.current.abort();
@@ -417,6 +422,10 @@ const ChatCoach = () => {
         localStorage.removeItem('nextapp_cv_messages');
         localStorage.removeItem('nextapp_cv_data');
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.src = '';
+        }
         navigate('/dashboard');
     };
 
@@ -562,6 +571,10 @@ const ChatCoach = () => {
     const stopInterview = async () => {
         // Detener voz y escucha inmediatamente
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.src = '';
+        }
         if (recognitionRef.current) recognitionRef.current.abort();
         setIsListening(false);
         setIsInterviewMode(false);
@@ -596,6 +609,10 @@ const ChatCoach = () => {
                     <button
                         onClick={() => {
                             if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+                            if (audioRef.current) {
+                                audioRef.current.pause();
+                                audioRef.current.src = '';
+                            }
                             
                             // Mostrar alerta de salida solo si estamos en CV mode con progreso
                             if (isCvMode && messages.length > 2) {
