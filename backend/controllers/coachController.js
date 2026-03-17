@@ -569,12 +569,12 @@ export const ttsCoach = async (req, res) => {
             input: { text },
             voice: {
                 languageCode: 'es-ES',
-                name: 'es-ES-Neural2-A', // Voz femenina de alta fidelidad (España)
+                name: 'es-ES-Neural2-A', // Voz femenina Premium de alta fidelidad
             },
             audioConfig: {
                 audioEncoding: 'MP3',
-                speakingRate: 1.0,
-                pitch: 0.0,
+                speakingRate: 0.95, // Ligeramente más pausado para sonar más natural
+                pitch: -1.0,         // Un tono ligeramente más bajo para mayor calidez
             },
         };
 
