@@ -5,6 +5,50 @@ import Message from '../models/Message.js';
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
+let ttsVoicesCache = { fetchedAt: 0, names: [] };
+
+const getAvailableGoogleTtsVoices = async () => {
+    const now = Date.now();
+    const cacheAgeMs = 10 * 60 * 1000; // 10 minutos
+    if (ttsVoicesCache.names.length > 0 && now - ttsVoicesCache.fetchedAt < cacheAgeMs) {
+        return ttsVoicesCache.names;
+    }
+
+    const listUrl = `https://texttospeech.googleapis.com/v1/voices?key=${process.env.GOOGLE_API_KEY}&languageCode=es-ES`;
+    const { data } = await axios.get(listUrl, { timeout: 15_000 });
+    const names = (data?.voices || []).map((v) => v.name).filter(Boolean);
+    ttsVoicesCache = { fetchedAt: now, names };
+    return names;
+};
+
+const pickGoogleVoice = (availableVoiceNames = []) => {
+    const preferred = [
+        process.env.GOOGLE_TTS_VOICE,
+        'es-ES-Neural2-A',
+        'es-ES-Wavenet-C',
+        'es-ES-Standard-A',
+    ].filter(Boolean);
+
+    const firstAvailablePreferred = preferred.find((name) => availableVoiceNames.includes(name));
+    if (firstAvailablePreferred) {
+        return {
+            name: firstAvailablePreferred,
+            languageCode: firstAvailablePreferred.startsWith('es-US-') ? 'es-US' : 'es-ES',
+        };
+    }
+
+    const fallbackSpanish = availableVoiceNames.find((name) => name.startsWith('es-ES-') || name.startsWith('es-US-'));
+    if (fallbackSpanish) {
+        return {
+            name: fallbackSpanish,
+            languageCode: fallbackSpanish.startsWith('es-US-') ? 'es-US' : 'es-ES',
+        };
+    }
+
+    // Fallback defensivo: si no pudo listar voces, usar una estándar estable.
+    return { name: 'es-ES-Standard-A', languageCode: 'es-ES' };
+};
+
 // ── Catálogo de etiquetas legibles ──────────
 const AREA_LABELS = {
     tech: 'Tecnología e Informática',
@@ -568,62 +612,42 @@ export const ttsCoach = async (req, res) => {
             });
         }
 
-        // Probamos una secuencia de voces para evitar caída total si una voz
-        // específica no está disponible para el proyecto/cuenta.
-        const voiceCandidates = [
-            { languageCode: 'es-ES', name: 'es-ES-Neural2-A' },
-            { languageCode: 'es-US', name: 'es-US-Neural2-A' },
-            { languageCode: 'es-ES', name: 'es-ES-Standard-A' },
-        ];
-
         const googleUrl = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${process.env.GOOGLE_API_KEY}`;
-        const errors = [];
-
-        for (const voice of voiceCandidates) {
-            try {
-                console.log(`[TTS] 🎙️ Intentando voz Google: ${voice.name}`);
-                const payload = {
-                    input: { text },
-                    voice,
-                    audioConfig: {
-                        audioEncoding: 'MP3',
-                        speakingRate: 0.95,
-                        pitch: -1.0,
-                    },
-                };
-
-                const { data } = await axios.post(googleUrl, payload, { timeout: 20_000 });
-                const audioContent = data?.audioContent;
-                if (!audioContent) {
-                    throw new Error('Google TTS respondió sin audioContent.');
-                }
-
-                const buffer = Buffer.from(audioContent, 'base64');
-                res.set('Content-Type', 'audio/mpeg');
-                res.set('Content-Length', buffer.length);
-                return res.send(buffer);
-            } catch (voiceError) {
-                const status = voiceError.response?.status;
-                const message = voiceError.response?.data?.error?.message || voiceError.message;
-                errors.push({ voice: voice.name, status, message });
-
-                // Si es error de autenticación/permisos/cuota, no tiene sentido
-                // seguir probando otras voces.
-                if ([401, 403, 429].includes(status)) break;
-            }
+        let availableVoiceNames = [];
+        try {
+            availableVoiceNames = await getAvailableGoogleTtsVoices();
+        } catch (listErr) {
+            console.warn('[TTS] No se pudo listar voces de Google, se usará fallback local:', listErr.response?.data || listErr.message);
         }
 
-        const firstError = errors[0] || { message: 'Fallo desconocido en Google TTS.' };
-        console.error('[ttsCoach] Error Google TTS:', errors);
-        return res.status(502).json({
-            error: 'Error al generar la voz con Google TTS.',
-            details: firstError.message,
-            attempts: errors,
-        });
+        const selectedVoice = pickGoogleVoice(availableVoiceNames);
+        console.log(`[TTS] 🎙️ Voz seleccionada: ${selectedVoice.name}`);
+
+        const payload = {
+            input: { text },
+            voice: selectedVoice,
+            audioConfig: {
+                audioEncoding: 'MP3',
+                speakingRate: 0.95,
+                pitch: -1.0,
+            },
+        };
+
+        const { data } = await axios.post(googleUrl, payload, { timeout: 20_000 });
+        const audioContent = data?.audioContent;
+        if (!audioContent) {
+            throw new Error('Google TTS respondió sin audioContent.');
+        }
+
+        const buffer = Buffer.from(audioContent, 'base64');
+        res.set('Content-Type', 'audio/mpeg');
+        res.set('Content-Length', buffer.length);
+        return res.send(buffer);
 
     } catch (error) {
-        console.error('[ttsCoach] Error:', error.response?.data || error.message);
-        return res.status(500).json({ error: 'Error al generar la voz.' });
+        const details = error.response?.data?.error?.message || error.response?.data || error.message;
+        console.error('[ttsCoach] Error:', details);
+        return res.status(502).json({ error: 'Error al generar la voz.', details });
     }
 };
 
