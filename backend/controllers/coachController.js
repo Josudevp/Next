@@ -7,6 +7,8 @@ const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
 
 let ttsVoicesCache = { fetchedAt: 0, names: [] };
 
+const getGoogleTtsKey = () => process.env.GOOGLE_TTS_KEY || process.env.GOOGLE_API_KEY;
+
 const getAvailableGoogleTtsVoices = async () => {
     const now = Date.now();
     const cacheAgeMs = 10 * 60 * 1000; // 10 minutos
@@ -14,7 +16,7 @@ const getAvailableGoogleTtsVoices = async () => {
         return ttsVoicesCache.names;
     }
 
-    const listUrl = `https://texttospeech.googleapis.com/v1/voices?key=${process.env.GOOGLE_API_KEY}&languageCode=es-ES`;
+    const listUrl = `https://texttospeech.googleapis.com/v1/voices?key=${getGoogleTtsKey()}&languageCode=es-ES`;
     const { data } = await axios.get(listUrl, { timeout: 15_000 });
     const names = (data?.voices || []).map((v) => v.name).filter(Boolean);
     ttsVoicesCache = { fetchedAt: now, names };
@@ -50,22 +52,32 @@ const pickGoogleVoice = (availableVoiceNames = []) => {
 };
 
 const synthesizeGoogleTts = async (googleUrl, text, voice) => {
-    const payload = {
-        input: { text },
-        voice,
-        audioConfig: {
-            audioEncoding: 'MP3',
-            speakingRate: 0.95,
-            pitch: -1.0,
-        },
-    };
+    try {
+        const payload = {
+            input: { text },
+            voice,
+            audioConfig: {
+                audioEncoding: 'MP3',
+                speakingRate: 0.95,
+                pitch: -1.0,
+            },
+        };
 
-    const { data } = await axios.post(googleUrl, payload, { timeout: 20_000 });
-    const audioContent = data?.audioContent;
-    if (!audioContent) {
-        throw new Error('Google TTS respondió sin audioContent.');
+        const { data } = await axios.post(googleUrl, payload, { timeout: 20_000 });
+        const audioContent = data?.audioContent;
+        if (!audioContent) {
+            throw new Error('Google TTS respondió sin audioContent.');
+        }
+        return Buffer.from(audioContent, 'base64');
+    } catch (error) {
+        // Esto muestra exactamente qué está rechazando Google en producción.
+        console.error('[Google TTS Error]', {
+            status: error.response?.status,
+            message: error.response?.data?.error?.message,
+            code: error.response?.data?.error?.code,
+        });
+        throw error;
     }
-    return Buffer.from(audioContent, 'base64');
 };
 
 // ── Catálogo de etiquetas legibles ──────────
@@ -624,14 +636,15 @@ export const ttsCoach = async (req, res) => {
     try {
         const { text } = req.body;
         if (!text) return res.status(400).json({ error: 'El campo text es requerido.' });
-        if (!process.env.GOOGLE_API_KEY) {
+        const googleTtsKey = getGoogleTtsKey();
+        if (!googleTtsKey) {
             return res.status(500).json({
                 error: 'TTS no configurado en servidor.',
-                details: 'Falta la variable GOOGLE_API_KEY en el backend.',
+                details: 'Falta GOOGLE_TTS_KEY o GOOGLE_API_KEY en el backend.',
             });
         }
 
-        const googleUrl = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${process.env.GOOGLE_API_KEY}`;
+        const googleUrl = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${googleTtsKey}`;
         let availableVoiceNames = [];
         try {
             availableVoiceNames = await getAvailableGoogleTtsVoices();
