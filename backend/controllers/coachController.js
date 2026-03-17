@@ -561,29 +561,65 @@ export const ttsCoach = async (req, res) => {
     try {
         const { text } = req.body;
         if (!text) return res.status(400).json({ error: 'El campo text es requerido.' });
+        if (!process.env.GOOGLE_API_KEY) {
+            return res.status(500).json({
+                error: 'TTS no configurado en servidor.',
+                details: 'Falta la variable GOOGLE_API_KEY en el backend.',
+            });
+        }
 
-        // ── Google Cloud TTS Neural2 ──────────────────────────────────────────
-        console.log(`[TTS] 🎙️ Generando audio con Google Neural2-A (Premium Spanish Voice)`);
+        // Probamos una secuencia de voces para evitar caída total si una voz
+        // específica no está disponible para el proyecto/cuenta.
+        const voiceCandidates = [
+            { languageCode: 'es-ES', name: 'es-ES-Neural2-A' },
+            { languageCode: 'es-US', name: 'es-US-Neural2-A' },
+            { languageCode: 'es-ES', name: 'es-ES-Standard-A' },
+        ];
+
         const googleUrl = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${process.env.GOOGLE_API_KEY}`;
-        const payload = {
-            input: { text },
-            voice: {
-                languageCode: 'es-ES',
-                name: 'es-ES-Neural2-A', // Voz femenina Premium de alta fidelidad
-            },
-            audioConfig: {
-                audioEncoding: 'MP3',
-                speakingRate: 0.95, // Ligeramente más pausado para sonar más natural
-                pitch: -1.0,         // Un tono ligeramente más bajo para mayor calidez
-            },
-        };
+        const errors = [];
 
-        const { data } = await axios.post(googleUrl, payload);
-        const buffer = Buffer.from(data.audioContent, 'base64');
+        for (const voice of voiceCandidates) {
+            try {
+                console.log(`[TTS] 🎙️ Intentando voz Google: ${voice.name}`);
+                const payload = {
+                    input: { text },
+                    voice,
+                    audioConfig: {
+                        audioEncoding: 'MP3',
+                        speakingRate: 0.95,
+                        pitch: -1.0,
+                    },
+                };
 
-        res.set('Content-Type', 'audio/mpeg');
-        res.set('Content-Length', buffer.length);
-        return res.send(buffer);
+                const { data } = await axios.post(googleUrl, payload, { timeout: 20_000 });
+                const audioContent = data?.audioContent;
+                if (!audioContent) {
+                    throw new Error('Google TTS respondió sin audioContent.');
+                }
+
+                const buffer = Buffer.from(audioContent, 'base64');
+                res.set('Content-Type', 'audio/mpeg');
+                res.set('Content-Length', buffer.length);
+                return res.send(buffer);
+            } catch (voiceError) {
+                const status = voiceError.response?.status;
+                const message = voiceError.response?.data?.error?.message || voiceError.message;
+                errors.push({ voice: voice.name, status, message });
+
+                // Si es error de autenticación/permisos/cuota, no tiene sentido
+                // seguir probando otras voces.
+                if ([401, 403, 429].includes(status)) break;
+            }
+        }
+
+        const firstError = errors[0] || { message: 'Fallo desconocido en Google TTS.' };
+        console.error('[ttsCoach] Error Google TTS:', errors);
+        return res.status(502).json({
+            error: 'Error al generar la voz con Google TTS.',
+            details: firstError.message,
+            attempts: errors,
+        });
 
     } catch (error) {
         console.error('[ttsCoach] Error:', error.response?.data || error.message);

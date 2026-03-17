@@ -342,6 +342,19 @@ const ChatCoach = () => {
             audioRef.current.pause();
             audioRef.current.src = '';
         }
+        if ('speechSynthesis' in window) {
+            window.speechSynthesis.cancel();
+        }
+
+        const fallbackBrowserTTS = () => {
+            if (!('speechSynthesis' in window)) return;
+            const utterance = new SpeechSynthesisUtterance(cleanText);
+            utterance.lang = 'es-ES';
+            utterance.rate = 0.95;
+            utterance.pitch = 1;
+            utteranceRef.current = utterance;
+            window.speechSynthesis.speak(utterance);
+        };
 
         try {
             const response = await axiosInstance.post(
@@ -362,7 +375,22 @@ const ChatCoach = () => {
             audio.onended = () => URL.revokeObjectURL(url);
             audio.play();
         } catch (err) {
-            console.error('[TTS Google Cloud] Error:', err);
+            let details = '';
+            const raw = err?.response?.data;
+            if (raw instanceof ArrayBuffer) {
+                try {
+                    const decoded = new TextDecoder().decode(raw);
+                    const parsed = JSON.parse(decoded);
+                    details = parsed?.details || parsed?.error || decoded;
+                } catch {
+                    details = err?.message || 'Fallo desconocido de TTS';
+                }
+            } else if (raw && typeof raw === 'object') {
+                details = raw.details || raw.error || '';
+            }
+
+            console.error('[TTS Google Cloud] Error:', details || err?.message || err);
+            fallbackBrowserTTS();
         }
     };
 
