@@ -22,12 +22,12 @@ const getAvailableGoogleTtsVoices = async () => {
 };
 
 const pickGoogleVoice = (availableVoiceNames = []) => {
-    const preferred = [
-        process.env.GOOGLE_TTS_VOICE,
-        'es-ES-Neural2-A',
-        'es-ES-Wavenet-C',
-        'es-ES-Standard-A',
-    ].filter(Boolean);
+    // Si el usuario define GOOGLE_TTS_VOICE, se respeta al 100%.
+    // Si no define nada, priorizamos Standard para máxima compatibilidad en prod.
+    const envPreferred = process.env.GOOGLE_TTS_VOICE;
+    const preferred = envPreferred
+        ? [envPreferred, 'es-ES-Standard-A', 'es-ES-Wavenet-C', 'es-ES-Neural2-A']
+        : ['es-ES-Standard-A', 'es-US-Standard-A', 'es-ES-Wavenet-C', 'es-ES-Neural2-A'];
 
     const firstAvailablePreferred = preferred.find((name) => availableVoiceNames.includes(name));
     if (firstAvailablePreferred) {
