@@ -49,6 +49,25 @@ const pickGoogleVoice = (availableVoiceNames = []) => {
     return { name: 'es-ES-Standard-A', languageCode: 'es-ES' };
 };
 
+const synthesizeGoogleTts = async (googleUrl, text, voice) => {
+    const payload = {
+        input: { text },
+        voice,
+        audioConfig: {
+            audioEncoding: 'MP3',
+            speakingRate: 0.95,
+            pitch: -1.0,
+        },
+    };
+
+    const { data } = await axios.post(googleUrl, payload, { timeout: 20_000 });
+    const audioContent = data?.audioContent;
+    if (!audioContent) {
+        throw new Error('Google TTS respondió sin audioContent.');
+    }
+    return Buffer.from(audioContent, 'base64');
+};
+
 // ── Catálogo de etiquetas legibles ──────────
 const AREA_LABELS = {
     tech: 'Tecnología e Informática',
@@ -623,23 +642,35 @@ export const ttsCoach = async (req, res) => {
         const selectedVoice = pickGoogleVoice(availableVoiceNames);
         console.log(`[TTS] 🎙️ Voz seleccionada: ${selectedVoice.name}`);
 
-        const payload = {
-            input: { text },
-            voice: selectedVoice,
-            audioConfig: {
-                audioEncoding: 'MP3',
-                speakingRate: 0.95,
-                pitch: -1.0,
-            },
-        };
+        let buffer;
+        try {
+            buffer = await synthesizeGoogleTts(googleUrl, text, selectedVoice);
+        } catch (namedVoiceErr) {
+            const message = namedVoiceErr.response?.data?.error?.message || namedVoiceErr.message || '';
+            const isInvalidVoice = /voice|invalid|supported|not found/i.test(message);
+            if (!isInvalidVoice) throw namedVoiceErr;
 
-        const { data } = await axios.post(googleUrl, payload, { timeout: 20_000 });
-        const audioContent = data?.audioContent;
-        if (!audioContent) {
-            throw new Error('Google TTS respondió sin audioContent.');
+            console.warn(`[TTS] Voz con name falló (${selectedVoice.name}). Reintentando sin name...`);
+            const genericVoiceFallbacks = [
+                { languageCode: 'es-ES', ssmlGender: 'FEMALE' },
+                { languageCode: 'es-US', ssmlGender: 'FEMALE' },
+                { languageCode: 'es-ES' },
+            ];
+
+            let lastErr = namedVoiceErr;
+            for (const genericVoice of genericVoiceFallbacks) {
+                try {
+                    console.log(`[TTS] 🔁 Reintento genérico: ${JSON.stringify(genericVoice)}`);
+                    buffer = await synthesizeGoogleTts(googleUrl, text, genericVoice);
+                    break;
+                } catch (retryErr) {
+                    lastErr = retryErr;
+                }
+            }
+
+            if (!buffer) throw lastErr;
         }
 
-        const buffer = Buffer.from(audioContent, 'base64');
         res.set('Content-Type', 'audio/mpeg');
         res.set('Content-Length', buffer.length);
         return res.send(buffer);
