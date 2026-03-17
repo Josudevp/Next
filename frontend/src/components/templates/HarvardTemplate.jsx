@@ -126,7 +126,7 @@ const HarvardTemplate = ({ cvData = {}, profilePicture = null, onFirstExport }) 
     };
 
     return (
-        <div className="cv-print-shell flex h-full min-h-0 flex-col bg-white">
+        <div className="cv-print-shell flex flex-1 min-h-0 flex-col bg-white">
             {/* ── Header con botón de descarga ── */}
             <div className="cv-print-toolbar flex items-center justify-between px-4 py-2.5 border-b border-gray-100 flex-shrink-0">
                 <div>
@@ -148,7 +148,7 @@ const HarvardTemplate = ({ cvData = {}, profilePicture = null, onFirstExport }) 
             {/* ── Área de scroll con la hoja A4 ── */}
             <div ref={scrollRef} className="cv-print-scroll flex-1 min-h-0 overflow-y-auto overflow-x-hidden bg-gray-100 p-4 flex flex-col items-center">
                 {!hasData ? (
-                    <div className="flex flex-col items-center justify-center h-full text-center gap-3 py-16">
+                    <div className="flex-1 min-h-0 flex flex-col overflow-hidden items-center justify-center text-center gap-3 py-16">
                         <div className="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center">
                             <FileText size={24} className="text-gray-300" />
                         </div>

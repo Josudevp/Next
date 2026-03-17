@@ -41,9 +41,9 @@ export const exportCvPdf = async (req, res) => {
         const safeName = (cvData.personalInfo?.name || 'MiCV')
             .normalize('NFD')
             .replace(/[\u0300-\u036f]/g, '')
-            .replace(/[^a-zA-Z0-9\s]/g, '')
-            .trim()
-            .replace(/\s+/g, '_') || 'MiCV';
+            .replace(/[^a-zA-Z0-9]/g, '_')
+            .replace(/_+/g, '_')
+            .trim();
 
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename="CV_${safeName}.pdf"`);

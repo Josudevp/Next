@@ -1,6 +1,6 @@
 import express from 'express';
 import multer from 'multer';
-import { chatWithCoach, initCoach, getChatHistory, ttsCoach, sttCoach } from '../controllers/coachController.js';
+import { chatWithCoach, initCoach, getChatHistory, clearChatHistory, ttsCoach, sttCoach } from '../controllers/coachController.js';
 import { authMiddleware } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -12,8 +12,11 @@ router.use(authMiddleware);
 // GET  /api/coach/init     → primer mensaje personalizado generado por Gemini con perfil del usuario
 router.get('/init', initCoach);
 
-// GET  /api/coach/history  → últimos 50 mensajes del usuario (memoria persistente)
+// GET    /api/coach/history  → últimos 50 mensajes del usuario (memoria persistente)
 router.get('/history', getChatHistory);
+
+// DELETE /api/coach/history  → elimina todos los mensajes del usuario
+router.delete('/history', clearChatHistory);
 
 // POST /api/coach/chat     → chat continuo (normal + simulación de entrevista)
 router.post('/chat', chatWithCoach);

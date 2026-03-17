@@ -103,11 +103,11 @@ const server = app.listen(PORT, () => {
   warmBrowser();
 
   // ── Digest diario de vacantes ─────────────────────────────────────────────
-  // 0 12 * * *  →  12:00 UTC = 7:00 AM Colombia (UTC-5)
+  // 0 8 * * *  →  8:00 AM hora de Colombia
   // Solo activo en producción para evitar correos accidentales en local.
   if (process.env.NODE_ENV === 'production') {
     import('./services/hunterNotificationService.js').then(({ runHunterDigest }) => {
-      cron.schedule('0 12 * * *', async () => {
+      cron.schedule('0 8 * * *', async () => {
         console.log('[digest] 🔔 Iniciando digest diario de vacantes...');
         try {
           await runHunterDigest();
@@ -115,8 +115,8 @@ const server = app.listen(PORT, () => {
         } catch (err) {
           console.error('[digest] ❌ Error en el digest:', err.message);
         }
-      }, { timezone: 'UTC' });
-      console.log('[digest] ⏰ Cron programado — 12:00 UTC diario');
+      }, { timezone: 'America/Bogota' });
+      console.log('[digest] ⏰ Cron programado — 08:00 AM Colombia (America/Bogota) diario');
     });
   }
 });

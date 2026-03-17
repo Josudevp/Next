@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
-import { Bot, Send, User, Loader2, ChevronLeft, Mic, MicOff, PlayCircle, SquareSquare, Activity, CheckCircle, AlertCircle, FileText, X } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
+import { Bot, Send, User, Loader2, ChevronLeft, Mic, MicOff, PlayCircle, SquareSquare, Activity, CheckCircle, AlertCircle, FileText, X, Trash2, Volume2, Sparkles } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import ReactMarkdown from 'react-markdown';
 import LogoNext from '../components/LogoNext';
 import Robot3D from '../components/Robot3D';
 import axiosInstance from '../api/axiosInstance';
@@ -10,6 +10,12 @@ import TemplateManager from './TemplateManager';
 const ChatCoach = () => {
     const navigate = useNavigate();
     const location = useLocation();
+
+    // Referencia paraTTS para evitar recolección de basura
+    const utteranceRef = useRef(null);
+    const audioRef = useRef(null); // Para audio de ElevenLabs
+
+    // La voz ahora se maneja 100% desde Google Cloud TTS (Neural2) en el Backend
 
     // Detectar modo creación de CV desde query param ?mode=createcv
     const isCvMode = new URLSearchParams(location.search).get('mode') === 'createcv';
@@ -30,6 +36,7 @@ const ChatCoach = () => {
 
     // Modal post-exportación: null | 'confirm' | 'changes'
     const [exportModal, setExportModal] = useState(null);
+    const [showExitModal, setShowExitModal] = useState(false);
 
     // Plantilla activa (puede cambiar desde el selector sin perder datos)
     const [selectedTemplate, setSelectedTemplate] = useState(templateId);
@@ -46,21 +53,10 @@ const ChatCoach = () => {
     });
     const [profilePicture, setProfilePicture] = useState(null);
 
-    // Los mensajes se restauran desde localStorage al recargar
-    const [messages, setMessages] = useState(() => {
-        try {
-            const saved = localStorage.getItem(chatStorageKey);
-            return saved ? JSON.parse(saved) : [];
-        } catch { return []; }
-    });
+    // Los mensajes se restauran localmente solo en CV Maker. En IA Coach, vienen de BD.
+    const [messages, setMessages] = useState([]);
     const [input, setInput] = useState('');
-    // Mostrar loader solo si arrancamos sin historial guardado
-    const [isTyping, setIsTyping] = useState(() => {
-        try {
-            const saved = localStorage.getItem(chatStorageKey);
-            return !saved || JSON.parse(saved).length === 0;
-        } catch { return true; }
-    });
+    const [isTyping, setIsTyping] = useState(true);
     const [isListening, setIsListening] = useState(false);
 
     // Referencias
@@ -84,13 +80,13 @@ const ChatCoach = () => {
         scrollToBottom();
     }, [messages, isTyping]);
 
-    // Persistir mensajes en localStorage para recuperar la sesión al recargar
+    // Persistir mensajes en localStorage *solo* para modo CV
     useEffect(() => {
-        if (messages.length > 0) {
-            localStorage.setItem(chatStorageKey, JSON.stringify(messages));
+        if (isCvMode && messages.length > 0) {
+            localStorage.setItem('nextapp_cv_messages', JSON.stringify(messages));
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [messages]);
+    }, [messages, isCvMode]);
 
     // Persistir datos del CV en localStorage (modo CV)
     useEffect(() => {
@@ -107,62 +103,75 @@ const ChatCoach = () => {
         }
     }, [isTyping, isInterviewMode]);
 
-    // Auto-envío del contexto de empleo tras recibir el saludo inicial
+    // Auto-envío del contexto de empleo tras recibir el saludo inicial (o historial de BD)
     useEffect(() => {
         if (
-            messages.length === 1 &&
-            messages[0].id === 'init' &&
+            messages.length > 0 &&
+            !isTyping &&
             pendingJobPrepRef.current &&
             sendMessageRef.current
         ) {
             const job = pendingJobPrepRef.current;
             pendingJobPrepRef.current = null;
-            const location = [job.job_city, job.job_country].filter(Boolean).join(', ');
-            const matchSummary = job.matchAnalysis?.summary
-                ? `**Compatibilidad detectada por NEXT:** ${job.matchAnalysis.score}% (${job.matchAnalysis.band}).\n`
-                : '';
-            const strengthsSummary = job.matchAnalysis?.strengths?.length
-                ? `**Fortalezas detectadas:** ${job.matchAnalysis.strengths.join(', ')}\n`
-                : '';
-            const gapsSummary = job.matchAnalysis?.missingSkills?.length
-                ? `**Brechas detectadas:** ${job.matchAnalysis.missingSkills.join(', ')}\n`
-                : '';
-            const resourcesSummary = job.matchAnalysis?.resources?.length
-                ? `**Recursos sugeridos:** ${job.matchAnalysis.resources.map((resource) => `${resource.skill}: ${resource.url}`).join(' | ')}\n`
-                : '';
-            const prompt =
+            // Si el prompt ya fue pre-procesado en JobHunter, usarlo directamente
+            const prompt = job._processedPrompt || (
                 `Quiero prepararme para aplicar a esta oferta laboral:\n\n` +
                 `**Cargo:** ${job.job_title || 'No especificado'}\n` +
                 `**Empresa:** ${job.employer_name || 'No especificada'}\n` +
-                `**Ubicación:** ${location || 'No especificada'}\n` +
+                `**Ubicaci\u00f3n:** ${[job.job_city, job.job_country].filter(Boolean).join(', ') || 'No especificada'}\n` +
                 `**Tipo de contrato:** ${job.job_employment_type || 'No especificado'}\n` +
-                `**Descripción:** ${(job.job_description || 'No disponible').slice(0, 800)}\n` +
-                `${matchSummary}${strengthsSummary}${gapsSummary}${resourcesSummary}\n` +
-                `¿Cómo debería prepararme para obtener este empleo? Dime qué habilidades técnicas y blandas debo destacar, qué podrían preguntarme en la entrevista y qué puedo mejorar según los requisitos.`;
+                `**Descripci\u00f3n:** ${(job.job_description || 'No disponible').slice(0, 700)}\n\n` +
+                `\u00bfC\u00f3mo debo prepararme? Dame un an\u00e1lisis estrat\u00e9gico: habilidades a destacar, preguntas probables de entrevista y c\u00f3mo cerrar brechas de habilidades.`
+            );
             sendMessageRef.current(null, prompt);
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [messages]);
+    }, [messages, isTyping]);
 
-    // 3. Saludo personalizado — GET /api/coach/init
-    // Solo se ejecuta si no hay historial guardado en localStorage.
-    // Usamos un flag `cancelled` para evitar que StrictMode (doble ejecución en dev)
-    // resetee el historial cuando la primera llamada llega después de que la segunda ya terminó.
+    // 3. Inicializar chat: restaurar sesión (DB en IA Coach, localStorage en CV Maker) o Saludo inicial
     useEffect(() => {
-        // Si ya tenemos mensajes guardados, no hace falta pedir el saludo al servidor
-        if (messages.length > 0) {
-            setIsTyping(false);
-            return;
-        }
-
         let cancelled = false;
+
+        const initializeChat = async () => {
+            if (isCvMode) {
+                // Modo CV Maker: recuperar de localStorage
+                try {
+                    const saved = localStorage.getItem('nextapp_cv_messages');
+                    const parsed = saved ? JSON.parse(saved) : [];
+                    if (parsed.length > 0) {
+                        if (!cancelled) {
+                            setMessages(parsed);
+                            setIsTyping(false);
+                            return;
+                        }
+                    }
+                } catch { /* Ignorar error */ }
+                // Si no hay local, buscar init del server
+                fetchInitGreeting();
+            } else {
+                // Modo IA Coach: persistencia en la BD
+                try {
+                    const { data } = await axiosInstance.get('/coach/history');
+                    if (cancelled) return;
+                    if (data.history && data.history.length > 0) {
+                        setMessages(data.history);
+                        setIsTyping(false);
+                    } else {
+                        fetchInitGreeting();
+                    }
+                } catch (error) {
+                    if (cancelled) return;
+                    console.error('[ChatCoach] Error cargando DB history:', error);
+                    fetchInitGreeting(); // fallback error
+                }
+            }
+        };
 
         const fetchInitGreeting = async () => {
             try {
-                setIsTyping(true);
                 const modeParam = isCvMode ? `?mode=createcv&templateId=${encodeURIComponent(templateId)}` : '';
                 const { data } = await axiosInstance.get(`/coach/init${modeParam}`);
-                if (cancelled) return; // StrictMode cleanup: ignorar respuesta de la invocación obsoleta
+                if (cancelled) return;
                 const greetingText = data.reply || (isCvMode
                     ? '¡Hola! Soy tu asistente de creación de CV de NEXT. Empieza contándome tu nombre completo.'
                     : '¡Hola! Soy tu IA Coach de NEXT. ¿En qué te puedo ayudar?');
@@ -187,12 +196,13 @@ const ChatCoach = () => {
             }
         };
 
-        fetchInitGreeting();
+        setIsTyping(true);
+        initializeChat();
 
         // Cleanup: marca la invocación como cancelada cuando StrictMode desmonta
         return () => { cancelled = true; };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [isCvMode, templateId]);
 
     // Carga la foto de perfil del usuario al entrar en modo CV (para la vista previa)
     useEffect(() => {
@@ -317,70 +327,40 @@ const ChatCoach = () => {
             .trim();
     };
 
-    // 5. Función de Text-to-Speech (Coach Voz) — voz masculina en español
-    const speakText = (text) => {
-        if (!('speechSynthesis' in window)) return;
-
-        window.speechSynthesis.cancel();
+    // 5. Función de Text-to-Speech (Coach Voz) — Google Cloud TTS Neural2 (vía Backend)
+    const speakText = async (text) => {
         const cleanText = cleanTextForSpeech(text);
+        if (!cleanText) return;
 
-        const utterance = new SpeechSynthesisUtterance(cleanText);
-        utterance.lang = 'es-ES';
-        utterance.rate = 0.95;
-        utterance.pitch = 0.80; // Tono bajo → percepción masculina
+        // ─ Detener cualquier audio previo ───────────────────────────────
+        if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.src = '';
+        }
 
-        // Nombres comunes para voces masculinas en español (Chrome, Linux, Safari, Windows)
-        const MALE_VOICE_NAMES = [
-            'Jorge', 'Carlos', 'Diego', 'Pablo', 'Juan', 'Miguel',
-            'Enrique', 'Matias', 'Rodrigo', 'Martin', 'Alvaro', 'Andres',
-            'David', 'Jose', 'Google español de Estados Unidos', 'Google español',
-            'Spanish Male', 'Male', 'Español', 'es-us', 'es-mx', 'es-es'
-        ];
-
-        const assignVoice = () => {
-            const voices = window.speechSynthesis.getVoices();
-            if (voices.length === 0) return false;
-
-            // 1. Priorizar por nombres conocidos de hombre + idioma español
-            let selected = voices.find(v =>
-                v.lang.startsWith('es') &&
-                MALE_VOICE_NAMES.some(name => v.name.toLowerCase().includes(name.toLowerCase()))
+        try {
+            const response = await axiosInstance.post(
+                '/coach/tts',
+                { text: cleanText }, // El backend ya sabe que es Google TTS
+                { responseType: 'arraybuffer' }
             );
 
-            // 2. Fallback: cualquier voz española que no sea claramente femenina
-            if (!selected) {
-                selected = voices.find(v =>
-                    v.lang.startsWith('es') &&
-                    (v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('hombre'))
-                ) || voices.find(v => v.lang.startsWith('es'));
+            const blob = new Blob([response.data], { type: 'audio/mpeg' });
+            
+            if (blob.size < 100) {
+                 throw new Error(`Error en el TTS, audio vacío`);
             }
 
-            if (selected) {
-                utterance.voice = selected;
-                // Si la voz parece femenina por nombre, bajamos el pitch para masculinizarla
-                const nameLow = selected.name.toLowerCase();
-                const isLikelyFemale = nameLow.includes('female') || nameLow.includes('woman') ||
-                    nameLow.includes('elena') || nameLow.includes('lucia') ||
-                    nameLow.includes('monica') || nameLow.includes('paulina') ||
-                    nameLow.includes('sabina') || nameLow.includes('helena');
-                utterance.pitch = isLikelyFemale ? 0.55 : 0.85;
-                console.debug('[TTS] Voz configurada (masculina):', selected.name);
-            } else {
-                utterance.pitch = 0.70; // Fallback grave para tono masculino
-            }
-            return true;
-        };
-
-        if (!assignVoice()) {
-            window.speechSynthesis.onvoiceschanged = () => {
-                assignVoice();
-                window.speechSynthesis.speak(utterance);
-                window.speechSynthesis.onvoiceschanged = null;
-            };
-        } else {
-            window.speechSynthesis.speak(utterance);
+            const url = URL.createObjectURL(blob);
+            const audio = new Audio(url);
+            audioRef.current = audio;
+            audio.onended = () => URL.revokeObjectURL(url);
+            audio.play();
+        } catch (err) {
+            console.error('[TTS Google Cloud] Error:', err);
         }
     };
+
 
     // 6.5  Fusiona datos parciales del CV para la vista previa en tiempo real
     const mergeCvData = (prev, next) => ({
@@ -411,9 +391,30 @@ const ChatCoach = () => {
         if (isCvMode) setExportModal('confirm');
     };
 
-    // Limpia toda la memoria de la sesión y vuelve al dashboard
+    // Eliminar historial de conversación del IA Coach desde la BD
+    const deleteConversation = async () => {
+        if (!window.confirm('\u00bfEliminar toda la conversación? Esta acción no se puede deshacer.')) return;
+        try {
+            await axiosInstance.delete('/coach/history');
+        } catch (err) {
+            console.error('[deleteConversation]', err);
+        }
+        setMessages([]);
+        setIsTyping(true);
+        // Solicitar nuevo saludo
+        try {
+            const { data } = await axiosInstance.get('/coach/init');
+            setMessages([{ id: 'init', text: data.reply || '¡Hola! Soy tu IA Coach de NEXT. ¿En qué te puedo ayudar?', sender: 'ai' }]);
+        } catch {
+            setMessages([{ id: 'init', text: '¡Hola! Soy tu IA Coach. ¿En qué puedo ayudarte hoy?', sender: 'ai' }]);
+        } finally {
+            setIsTyping(false);
+        }
+    };
+
+    // Limpia toda la memoria de la sesión local (útil para CV mode) y vuelve al dashboard
     const clearSessionAndExit = () => {
-        localStorage.removeItem(chatStorageKey);
+        localStorage.removeItem('nextapp_cv_messages');
         localStorage.removeItem('nextapp_cv_data');
         if ('speechSynthesis' in window) window.speechSynthesis.cancel();
         navigate('/dashboard');
@@ -595,7 +596,13 @@ const ChatCoach = () => {
                     <button
                         onClick={() => {
                             if ('speechSynthesis' in window) window.speechSynthesis.cancel();
-                            navigate('/dashboard');
+                            
+                            // Mostrar alerta de salida solo si estamos en CV mode con progreso
+                            if (isCvMode && messages.length > 2) {
+                                setShowExitModal(true);
+                            } else {
+                                navigate('/dashboard');
+                            }
                         }}
                         className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-[#2563EB] transition-colors cursor-pointer flex-shrink-0"
                     >
@@ -631,7 +638,17 @@ const ChatCoach = () => {
                         )}
                     </div>
 
-                    <div className="ml-auto lg:ml-0">
+                    <div className="ml-auto lg:ml-0 flex items-center gap-2">
+                        {/* Botón borrar conversación — solo en IA Coach (no CV mode, no entrevista) */}
+                        {!isCvMode && !isInterviewMode && (
+                            <button
+                                onClick={deleteConversation}
+                                title="Eliminar conversación"
+                                className="flex items-center gap-1.5 text-xs text-gray-400 border border-gray-200 hover:border-red-300 hover:text-red-500 hover:bg-red-50 rounded-xl px-3 py-1.5 transition-all cursor-pointer"
+                            >
+                                <Trash2 size={12} /> <span className="hidden sm:inline">Borrar chat</span>
+                            </button>
+                        )}
                     </div>
                 </div>
 
@@ -893,7 +910,7 @@ const ChatCoach = () => {
                     </button>
                 </div>
                 {/* TemplateManager ocupa el resto */}
-                <div className="flex-1 min-h-0">
+                <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
                     <TemplateManager
                         templateId={selectedTemplate}
                         cvData={cvData}
@@ -901,6 +918,41 @@ const ChatCoach = () => {
                         onChangeTemplate={(id) => { setSelectedTemplate(id); }}
                         onFirstExport={handleFirstExport}
                     />
+                </div>
+            </div>
+        )}
+
+        {/* ── MODAL DE CONFIRMACIÓN DE SALIDA CV MAKER ────────────────────── */}
+        {showExitModal && (
+            <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+                <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl relative overflow-hidden animate-fade-in-up text-center">
+                    <div className="w-16 h-16 bg-amber-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <AlertCircle size={32} className="text-amber-500" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 mb-2">¿Seguro que quieres salir?</h3>
+                    <p className="text-gray-500 text-sm mb-6">
+                        Tienes un proceso de creación de CV en curso. ¿Deseas mantener tu progreso para la próxima vez o empezar desde cero?
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-3 w-full">
+                        <button
+                            onClick={clearSessionAndExit}
+                            className="flex-1 px-4 py-2.5 rounded-xl font-semibold text-red-600 bg-red-50 hover:bg-red-100 transition-colors cursor-pointer"
+                        >
+                            Borrar todo y salir
+                        </button>
+                        <button
+                            onClick={() => navigate('/dashboard')}
+                            className="flex-1 px-4 py-2.5 rounded-xl font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors cursor-pointer"
+                        >
+                            Guardar y salir
+                        </button>
+                    </div>
+                    <button
+                        onClick={() => setShowExitModal(false)}
+                        className="mt-4 text-sm text-gray-400 hover:text-gray-600 font-medium cursor-pointer"
+                    >
+                        Cancelar, seguir aquí
+                    </button>
                 </div>
             </div>
         )}

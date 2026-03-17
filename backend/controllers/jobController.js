@@ -535,7 +535,8 @@ export const searchJobsForUser = async ({ userId, query = '', location = '', req
   const levelHint = QUERY_LEVEL_HINT[userExperienceLevel] || '';
   const enrichedQuery = levelHint ? `${finalQuery} ${levelHint}` : finalQuery;
 
-  console.log(`[JobController] Buscando: "${enrichedQuery}" | nivel: ${userExperienceLevel || 'N/A'}`);
+  console.log(`[Job Search] 🔍 Query: "${baseQuery}" | Traducido: "${finalQuery}" | Nivel: ${userExperienceLevel || 'N/A'}`);
+  console.log(`[Job Search] 📡 Consultando fuentes: Adzuna (US/GB), Remotive, Jobicy, Jooble, CareerJet...`);
 
   const [adzunaUs, adzunaGb, remotiveJobs, jobicyJobs, joobleJobs, careerjetJobs] = await Promise.all([
     fetchAdzuna(enrichedQuery, 'us', 1, 20).catch((e) => {
@@ -579,7 +580,8 @@ export const searchJobsForUser = async ({ userId, query = '', location = '', req
     _scope: job._scope || (isColombiaJob(job) ? 'colombia' : 'internacional'),
   }));
 
-  console.log(`[JobController] "${enrichedQuery}" → AdzunaUS:${adzunaUs.length} AdzunaGB:${adzunaGb.length} Remotive:${remotiveJobs.length} Jobicy:${jobicyJobs.length} Jooble:${joobleJobs.length} CareerJet:${careerjetJobs.length} | raw:${raw.length} dedup:${sane.length} | tras filtro exp:${afterExpFilter.length} | pool final:${tagged.length}`);
+  console.log(`[Job Search] 📊 Resultados: AdzunaUS:${adzunaUs.length} AdzunaGB:${adzunaGb.length} Remotive:${remotiveJobs.length} Jobicy:${jobicyJobs.length} Jooble:${joobleJobs.length} CareerJet:${careerjetJobs.length}`);
+  console.log(`[Job Search] ✅ Pool final (${tagged.length} ofertas) listo para enviar al cliente.`);
   setCache(cacheKey, tagged);
   setDevCache(cacheKey, tagged);
 

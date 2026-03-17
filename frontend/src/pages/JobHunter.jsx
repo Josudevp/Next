@@ -232,7 +232,24 @@ const JobCard = ({ job }) => {
           Ver oferta <ExternalLink size={13} />
         </a>
         <button
-          onClick={() => navigate('/ia-coach', { state: { jobPrep: job } })}
+          onClick={() => {
+            const location = [job.job_city, job.job_country].filter(Boolean).join(', ') || 'No especificada';
+            const gaps = job.matchAnalysis?.missingSkills?.slice(0, 3) || [];
+            const descSnippet = (job.job_description || '').replace(/\n+/g, ' ').trim().slice(0, 400);
+
+            // Prompt breve, orientado a perfil junior. Sin subtareas numeradas para
+            // evitar que la IA genere una respuesta de 5 secciones largas.
+            const lines = [
+              `Quiero prepararme para esta vacante (soy un candidato con poca experiencia):`,
+              `**Cargo:** ${job.job_title || 'No especificado'} — **Empresa:** ${job.employer_name || 'No especificada'} — **Ubicación:** ${location}`,
+              descSnippet ? `**Descripción breve:** ${descSnippet}` : null,
+              gaps.length > 0 ? `**Habilidades que me faltan según el análisis:** ${gaps.join(', ')}` : null,
+              ``,
+              `Dame un consejo práctico y directo (máximo 3 puntos cortos): qué destacar, qué pregunta clave preparar y cómo suplir mis brechas. Sin introducciones largas.`,
+            ].filter(Boolean).join('\n');
+
+            navigate('/ia-coach', { state: { jobPrep: { ...job, _processedPrompt: lines } } });
+          }}
           className="flex-1 inline-flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-semibold text-[#7C3AED] border-2 border-purple-200 bg-purple-50 transition-all hover:bg-purple-100 hover:border-purple-300 hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
         >
           🎯 Prepararme

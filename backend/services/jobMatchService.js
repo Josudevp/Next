@@ -357,27 +357,24 @@ const computeExperienceBlock = (candidateYears, jobTitle, jobText) => {
   return { score, maxCap };
 };
 
-// Ponderación de skills por criticidad:
-//   • Skills presentes en el título del puesto → peso ×3 (son el core del rol)
-//   • Skills secundarias técnicas             → peso ×1
-//   • Habilidades blandas (tier: 'soft')       → peso ×0.4 (no determinan elegibilidad)
 const computeWeightedSkillScore = (requiredSkills, candidateSkills, jobTitle) => {
-  if (requiredSkills.length === 0) {
-    return candidateSkills.length > 0 ? 58 : 42;
+  const hardSkills = requiredSkills.filter(s => SKILL_LIBRARY[s]?.tier !== 'soft');
+
+  if (hardSkills.length === 0) {
+    const candidateHardSkills = candidateSkills.filter(s => SKILL_LIBRARY[s]?.tier !== 'soft');
+    return candidateHardSkills.length > 0 ? 58 : 42;
   }
 
   const normalizedTitle = normalizeText(jobTitle);
   let totalWeight = 0;
   let matchedWeight = 0;
 
-  requiredSkills.forEach((skill) => {
+  hardSkills.forEach((skill) => {
     const entry = SKILL_LIBRARY[skill];
     const aliases = entry?.aliases || [];
     const isCoreForRole = aliases.some((alias) => normalizedTitle.includes(normalizeText(alias)));
 
-    const weight = isCoreForRole ? 3.0
-      : entry?.tier === 'soft'  ? 0.4
-      : 1.0;
+    const weight = isCoreForRole ? 3.0 : 1.0;
 
     totalWeight += weight;
     if (candidateSkills.includes(skill)) matchedWeight += weight;
@@ -443,7 +440,10 @@ export const enrichJobsWithMatchData = (jobs = [], user = {}) => {
 
   return jobs.map((job) => {
     const jobText = extractJobText(job);
-    const requiredSkills = extractKnownSkillsFromText(jobText);
+    const requiredSkillsAll = extractKnownSkillsFromText(jobText);
+    
+    // Filtramos habilidades blandas del análisis: no cuentan para el match ni aparecen en la UI de Match
+    const requiredSkills = requiredSkillsAll.filter(s => SKILL_LIBRARY[s]?.tier !== 'soft');
     const matchedSkills = requiredSkills.filter((skill) => candidate.skills.includes(skill));
     const missingSkills = requiredSkills.filter((skill) => !candidate.skills.includes(skill));
 
@@ -469,11 +469,8 @@ export const enrichJobsWithMatchData = (jobs = [], user = {}) => {
         url: SKILL_LIBRARY[skill]?.resource?.url || 'https://roadmap.sh/',
       }));
 
-    // Ordenar skills coincidentes: primero habilidades técnicas (tier != 'soft'),
-    // luego blandas. Así "Fuerte en X" muestra lo más relevante para la vacante.
-    const hardMatched = matchedSkills.filter((s) => SKILL_LIBRARY[s]?.tier !== 'soft');
-    const softMatched = matchedSkills.filter((s) => SKILL_LIBRARY[s]?.tier === 'soft');
-    const orderedMatched = [...hardMatched, ...softMatched];
+    // Al haber filtrado arriba, aquí ya solo hay hard skills
+    const orderedMatched = matchedSkills;
 
     return {
       ...job,

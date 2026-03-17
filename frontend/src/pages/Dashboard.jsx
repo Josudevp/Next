@@ -134,6 +134,23 @@ const Dashboard = () => {
   const [score, setScore] = useState(0)
   const [animatedScore, setAnimatedScore] = useState(0)
   const [loadError, setLoadError] = useState(false)
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+
+  // ─── Daily Notifications ─────────────────────────────────────
+  const generateDailySuggestions = (skills) => {
+    const defaults = [
+      { id: 1, title: 'Mejora tu Comunicación Efectiva', desc: 'Comunica tus ideas con claridad en entrevistas.', type: 'soft', time: '5 min' },
+      { id: 2, title: 'Domina las Entrevistas Técnicas', desc: 'Prepara las preguntas más comunes de tu área.', type: 'tech', time: '10 min' },
+      { id: 3, title: 'Optimiza tu CV', desc: 'Haz que tu perfil destaque para los reclutadores.', type: 'profile', time: '8 min' }
+    ]
+    if (!skills || skills.length === 0) return defaults
+
+    const skill = skills[0]
+    return [
+      { id: 1, title: `Profundiza en ${skill}`, desc: `Asegúrate de dominar los fundamentos y últimas tendencias de ${skill}.`, type: 'tech', time: '10 min' },
+      ...defaults.slice(0, 2)
+    ]
+  }
 
   // ── Auth guard + carga de datos remotos ──────────────────────────────────
   const loadProfile = async () => {
@@ -300,6 +317,7 @@ const Dashboard = () => {
   const displayName = profile?.name || user?.name || 'Usuario'
   const firstName = displayName ? displayName.split(' ')[0] : 'Usuario'
   const skillsArray = profile?.skills || []
+  const suggestions = generateDailySuggestions(skillsArray)
 
   return (
     <div className="min-h-screen bg-next-gray">
@@ -318,13 +336,39 @@ const Dashboard = () => {
           <LogoNext />
           <div className="flex items-center gap-3">
             {/* Notificaciones — estático para Beta */}
-            <button
-              aria-label="Notificaciones"
-              className="relative w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors cursor-pointer"
-            >
-              <Bell size={18} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-next-primary rounded-full ring-2 ring-white" />
-            </button>
+            <div className="relative">
+              <button
+                onClick={() => setNotificationsOpen(!notificationsOpen)}
+                aria-label="Notificaciones"
+                className="relative w-9 h-9 rounded-xl flex items-center justify-center text-gray-400 hover:bg-gray-100 transition-colors cursor-pointer"
+              >
+                <Bell size={18} />
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-next-primary rounded-full ring-2 ring-white" />
+              </button>
+              
+              {notificationsOpen && (
+                <div className="absolute right-0 top-11 bg-white border border-gray-100 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] w-80 z-50 animate-fade-in overflow-hidden">
+                  <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
+                    <h3 className="font-bold text-gray-800 text-sm">Habilidades de la Semana</h3>
+                    <span className="text-[10px] font-bold bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">3 Nuevas</span>
+                  </div>
+                  <div className="p-2 space-y-1">
+                    {suggestions.map(s => (
+                       <div key={s.id} className="p-3 hover:bg-slate-50 rounded-xl transition-colors cursor-pointer group">
+                         <div className="flex justify-between items-start mb-1">
+                           <p className="font-semibold text-gray-800 text-sm group-hover:text-blue-600 transition-colors">{s.title}</p>
+                           <span className="text-[10px] text-gray-400 flex items-center gap-1"><TrendingUp size={10}/> {s.time}</span>
+                         </div>
+                         <p className="text-xs text-gray-500 leading-relaxed">{s.desc}</p>
+                       </div>
+                    ))}
+                  </div>
+                  <div className="px-4 py-2 border-t border-gray-50 bg-gray-50/50 text-center">
+                    <span className="text-xs text-gray-400">Recomendaciones basadas en tu perfil</span>
+                  </div>
+                </div>
+              )}
+            </div>
 
             <UserAvatar
               name={displayName}
@@ -376,9 +420,20 @@ const Dashboard = () => {
           <div className="bg-white rounded-2xl border border-gray-100 p-6 shadow-[0_2px_12px_rgba(0,0,0,0.04)] animate-fade-in-up">
             <div className="flex items-start justify-between mb-4">
               <h2 className="font-bold text-gray-900">Nivel de empleabilidad</h2>
-              <button className="flex items-center gap-1 text-xs text-gray-400 border border-gray-200 rounded-full px-3 py-1 hover:border-next-primary hover:text-next-primary transition-all cursor-pointer">
-                <HelpCircleIcon /> ¿Cómo se calcula?
-              </button>
+              <div className="relative group flex items-center">
+                <button className="flex items-center gap-1 text-xs text-gray-400 border border-gray-200 rounded-full px-3 py-1 hover:border-next-primary hover:text-next-primary transition-all cursor-pointer">
+                  <HelpCircleIcon /> ¿Cómo se calcula?
+                </button>
+                <div className="absolute right-0 top-full mt-2 w-64 bg-gray-800 text-white text-xs rounded-xl p-3 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50">
+                  Tu puntuación se alimenta de:
+                  <ul className="list-disc ml-4 mt-1 space-y-0.5 text-gray-300">
+                    <li>Tus habilidades (técnicas y blandas)</li>
+                    <li>Tu nivel de experiencia y metas</li>
+                    <li>La completitud general de tu perfil</li>
+                  </ul>
+                  <div className="absolute -top-1 right-5 w-3 h-3 bg-gray-800 transform rotate-45"></div>
+                </div>
+              </div>
             </div>
 
             <div className="flex items-center gap-5">

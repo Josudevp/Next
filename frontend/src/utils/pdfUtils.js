@@ -17,7 +17,7 @@ export async function downloadCvPdf(cvData, templateId, profilePicture, personNa
     const response = await axiosInstance.post(
         '/export/pdf',
         { cvData, templateId, profilePicture: profilePicture || null },
-        { responseType: 'blob', timeout: 120_000 },
+        { responseType: 'arraybuffer', timeout: 120_000 },
     );
 
     const blob = new Blob([response.data], { type: 'application/pdf' });
@@ -26,9 +26,9 @@ export async function downloadCvPdf(cvData, templateId, profilePicture, personNa
     const safeName = (personName || 'MiCV')
         .normalize('NFD')
         .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[^a-zA-Z0-9\s]/g, '')
-        .trim()
-        .replace(/\s+/g, '_') || 'MiCV';
+        .replace(/[^a-zA-Z0-9]/g, '_')
+        .replace(/_+/g, '_')
+        .trim();
 
     const a = document.createElement('a');
     a.href = url;

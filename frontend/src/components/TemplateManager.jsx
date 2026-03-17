@@ -305,12 +305,13 @@ const TemplateManager = ({ templateId, cvData, profilePicture, onChangeTemplate,
     const { Component } = TEMPLATE_REGISTRY[currentId];
 
     return (
-        <div className="cv-print-tm flex h-full min-h-0 flex-col">
+        <div className="cv-print-tm flex h-full min-h-0 flex-col overflow-hidden">
             {/* Carrusel de plantillas */}
             <TemplateCarousel selectedId={currentId} onSelect={onChangeTemplate} />
 
-            {/* Renderizado de la plantilla activa */}
-            <div className="cv-print-content flex-1 min-h-0 overflow-hidden">
+            {/* Renderizado de la plantilla activa — flex-1 + overflow-hidden deja que
+                el scroll interno de cada plantilla (cv-print-scroll) funcione */}
+            <div className="cv-print-content flex-1 min-h-0 overflow-hidden flex flex-col">
                 <Component cvData={cvData} profilePicture={profilePicture} onFirstExport={onFirstExport} />
             </div>
         </div>

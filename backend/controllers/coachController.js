@@ -201,7 +201,7 @@ const buildModel = (isReport, isInterview, systemPrompt) => {
         { category: 'HARM_CATEGORY_SEXUALLY_EXPLICIT', threshold: 'BLOCK_ONLY_HIGH' },
         { category: 'HARM_CATEGORY_DANGEROUS_CONTENT', threshold: 'BLOCK_ONLY_HIGH' },
     ];
-    console.log(`[Gemini] Modelo seleccionado: ${modelName}`);
+    console.log(`[Gemini] 🧠 Iniciando chat con modelo: ${modelName} | Modo: ${isReport ? 'REPORTE' : isInterview ? 'ENTREVISTA' : 'COACH'}`);
 
     // Inyección nativa del system prompt
     return genAI.getGenerativeModel({
@@ -384,6 +384,17 @@ export const getChatHistory = async (req, res) => {
             attributes: ['id', 'sender', 'text', 'createdAt'],
         });
 
+        // ── AUTO-CLEANUP RETROACTIVO DE CONTAMINACIÓN DE CV MAKER ──
+        // Si detectamos texto de plantillas CV en la BD (guardados antes del fix),
+        // borramos la conversación para que el coach normal vuelva a su rol estándar
+        // y no se quede pegado repitiendo formato JSON.
+        const isPolluted = messages.some(m => m.text.includes('[CV_PARTIAL]') || m.text.includes('[CV_FINAL_DATA]'));
+        if (isPolluted) {
+            console.warn(`[getChatHistory] Detectada contaminación de CV Maker para userId ${userId}. Purgando historial de BD.`);
+            await Message.destroy({ where: { userId } });
+            return res.json({ history: [] });
+        }
+
         // Normalizar al formato que ya usa el frontend: { id, sender, text }
         const normalized = messages.map((m) => ({
             id: m.id.toString(),
@@ -395,6 +406,20 @@ export const getChatHistory = async (req, res) => {
     } catch (error) {
         console.error('[getChatHistory] Error:', error.message);
         return res.status(500).json({ error: 'No se pudo cargar el historial.' });
+    }
+};
+
+// ══════════════════════════════════════════════════════════════════════════════
+// DELETE /api/coach/history  → Elimina todos los mensajes del usuario
+// ══════════════════════════════════════════════════════════════════════════════
+export const clearChatHistory = async (req, res) => {
+    try {
+        const userId = req.user.userId;
+        await Message.destroy({ where: { userId } });
+        return res.json({ ok: true });
+    } catch (error) {
+        console.error('[clearChatHistory] Error:', error.message);
+        return res.status(500).json({ error: 'No se pudo borrar el historial.' });
     }
 };
 
@@ -482,8 +507,10 @@ export const chatWithCoach = async (req, res) => {
             : message;
 
         // ── Guardar mensaje del usuario en la BD ─────────────────────────────
-        // El reporte final (finishSimulation=true) y el modo CV siempre se persisten.
-        if ((!isInterviewMode || finishSimulation || isCvMode) && message) {
+        // SOLO coach normal y el reporte final de entrevista. El modo CV usa
+        // localStorage en el frontend — NO se persiste en la BD para no mezclar
+        // historial del coach con el de creación de CV.
+        if (!isCvMode && (!isInterviewMode || finishSimulation) && message) {
             await Message.create({ userId, sender: 'user', text: message });
         }
 
@@ -513,8 +540,8 @@ export const chatWithCoach = async (req, res) => {
         }
 
         // ── Guardar respuesta de la IA en la BD ──────────────────────────────
-        // El reporte final y el modo CV siempre se persisten.
-        if (!isInterviewMode || finishSimulation || isCvMode) {
+        // Mismo criterio: solo coach normal y reporte final. CV usa localStorage.
+        if (!isCvMode && (!isInterviewMode || finishSimulation)) {
             await Message.create({ userId, sender: 'ai', text: replyText });
         }
 
@@ -527,19 +554,22 @@ export const chatWithCoach = async (req, res) => {
 };
 
 // ══════════════════════════════════════════════════════════════════════════════
-// POST /api/coach/tts  → Convierte texto en audio con Google Cloud TTS Neural2
+// POST /api/coach/tts  → Dual TTS: Google Neural2 (default) | ElevenLabs (premium)
+//   Body: { text: string, provider?: 'google' | 'elevenlabs' }
 // ══════════════════════════════════════════════════════════════════════════════
 export const ttsCoach = async (req, res) => {
     try {
         const { text } = req.body;
         if (!text) return res.status(400).json({ error: 'El campo text es requerido.' });
 
-        const url = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${process.env.GOOGLE_API_KEY}`;
+        // ── Google Cloud TTS Neural2 ──────────────────────────────────────────
+        console.log(`[TTS] 🎙️ Generando audio con Google Neural2-A (Premium Spanish Voice)`);
+        const googleUrl = `https://texttospeech.googleapis.com/v1/text:synthesize?key=${process.env.GOOGLE_API_KEY}`;
         const payload = {
             input: { text },
             voice: {
-                languageCode: 'es-US',
-                name: 'es-US-Neural2-B', // Voz masculina natural Neural2
+                languageCode: 'es-ES',
+                name: 'es-ES-Neural2-A', // Voz femenina de alta fidelidad (España)
             },
             audioConfig: {
                 audioEncoding: 'MP3',
@@ -548,7 +578,7 @@ export const ttsCoach = async (req, res) => {
             },
         };
 
-        const { data } = await axios.post(url, payload);
+        const { data } = await axios.post(googleUrl, payload);
         const buffer = Buffer.from(data.audioContent, 'base64');
 
         res.set('Content-Type', 'audio/mpeg');
