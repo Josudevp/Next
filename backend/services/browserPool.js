@@ -16,12 +16,23 @@
 
 import puppeteer from 'puppeteer-core';
 import chromium from '@sparticuz/chromium';
+import fs from 'fs';
 
 let _browser = null;
 let _launching = null; // pending launch promise — prevents concurrent launches
 
 async function launch() {
     const executablePath = await chromium.executablePath();
+    
+    // Ensure correct file permissions for the executable (Fixes issue in production)
+    if (executablePath) {
+        try {
+            fs.chmodSync(executablePath, 0o755);
+        } catch (err) {
+            console.warn('[browserPool] Error setting permissions:', err.message);
+        }
+    }
+
     return puppeteer.launch({
         args: [
             ...chromium.args,

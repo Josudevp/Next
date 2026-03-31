@@ -57,12 +57,12 @@ const Home = () => {
                 {/* Content Section */}
                 <section className='flex w-full flex-col items-center gap-4 pt-0 md:w-1/2 md:items-start md:gap-5 md:pt-0'>
                     {/* Main Heading and Description */}
-                    <div className='flex w-full max-w-88 flex-col gap-3 md:max-w-none md:gap-4'>
+                    <div className='flex w-full max-w-xs sm:max-w-md md:max-w-none flex-col gap-3 md:gap-4'>
                         <h1 className='text-center text-[2.25rem] font-bold leading-[0.96] text-pretty text-black sm:text-[2.65rem] md:text-left md:text-[2.9rem] lg:text-[3.3rem] xl:text-[3.6rem]'>
                             Busca <span className='text-[#3B82F6]'>empleo</span> con la confianza de un <span className='text-[#3B82F6]'>experto</span>
                         </h1>
                         
-                        <p className='mx-auto max-w-80 text-[0.95rem] text-center text-slate-800 text-pretty leading-relaxed sm:max-w-xl sm:text-[1rem] md:mx-0 md:max-w-xl md:text-left lg:text-[1.12rem]'>
+                        <p className='mx-auto max-w-[280px] sm:max-w-xl text-[0.95rem] text-center text-slate-800 text-pretty leading-relaxed sm:text-[1rem] md:mx-0 md:max-w-xl md:text-left lg:text-[1.12rem]'>
                             Next es el instructor IA que transforma tu perfil académico en una marca profesional imparable, guiándote hacia las vacantes donde tu talento brilla.
                         </p>
                     </div>

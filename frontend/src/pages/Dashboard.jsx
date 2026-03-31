@@ -347,7 +347,7 @@ const Dashboard = () => {
               </button>
               
               {notificationsOpen && (
-                <div className="absolute right-0 top-11 bg-white border border-gray-100 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] w-80 z-50 animate-fade-in overflow-hidden">
+                <div className="absolute right-0 top-11 bg-white border border-gray-100 rounded-2xl shadow-[0_4px_20px_rgba(0,0,0,0.08)] w-[calc(100vw-2rem)] sm:w-80 z-50 animate-fade-in overflow-hidden">
                   <div className="px-4 py-3 border-b border-gray-50 flex items-center justify-between">
                     <h3 className="font-bold text-gray-800 text-sm">Habilidades de la Semana</h3>
                     <span className="text-[10px] font-bold bg-blue-50 text-blue-600 px-2 py-0.5 rounded-full">3 Nuevas</span>

@@ -4,7 +4,6 @@ import User from '../models/User.js';
 import Message from '../models/Message.js';
 
 const genAI = new GoogleGenerativeAI(process.env.GOOGLE_API_KEY);
-
 let ttsVoicesCache = { fetchedAt: 0, names: [] };
 
 const getGoogleTtsKey = () => process.env.GOOGLE_TTS_KEY || process.env.GOOGLE_API_KEY;
@@ -25,11 +24,12 @@ const getAvailableGoogleTtsVoices = async () => {
 
 const pickGoogleVoice = (availableVoiceNames = []) => {
     // Si el usuario define GOOGLE_TTS_VOICE, se respeta al 100%.
-    // Si no define nada, priorizamos Standard para máxima compatibilidad en prod.
+    // Lista de preferencia: solo voces MASCULINAS verificadas en la API actual.
+    // NOTA: Neural2-B fue eliminado por Google. Usar Neural2-F o Neural2-G.
     const envPreferred = process.env.GOOGLE_TTS_VOICE;
     const preferred = envPreferred
-        ? [envPreferred, 'es-ES-Standard-A', 'es-ES-Wavenet-C', 'es-ES-Neural2-A']
-        : ['es-ES-Standard-A', 'es-US-Standard-A', 'es-ES-Wavenet-C', 'es-ES-Neural2-A'];
+        ? [envPreferred, 'es-ES-Neural2-F', 'es-ES-Neural2-G', 'es-ES-Chirp3-HD-Enceladus', 'es-ES-Chirp3-HD-Zubenelgenubi', 'es-ES-Studio-F']
+        : ['es-ES-Neural2-F', 'es-ES-Neural2-G', 'es-ES-Chirp3-HD-Enceladus', 'es-ES-Chirp3-HD-Zubenelgenubi', 'es-ES-Studio-F'];
 
     const firstAvailablePreferred = preferred.find((name) => availableVoiceNames.includes(name));
     if (firstAvailablePreferred) {
@@ -39,16 +39,20 @@ const pickGoogleVoice = (availableVoiceNames = []) => {
         };
     }
 
-    const fallbackSpanish = availableVoiceNames.find((name) => name.startsWith('es-ES-') || name.startsWith('es-US-'));
-    if (fallbackSpanish) {
+    // Fallback: cualquier voz Neural2 masculina disponible
+    const maleSpanish = availableVoiceNames.find((name) =>
+        name === 'es-ES-Neural2-F' || name === 'es-ES-Neural2-G' || name === 'es-ES-Studio-F'
+    );
+    if (maleSpanish) {
         return {
-            name: fallbackSpanish,
-            languageCode: fallbackSpanish.startsWith('es-US-') ? 'es-US' : 'es-ES',
+            name: maleSpanish,
+            languageCode: 'es-ES',
         };
     }
 
-    // Fallback defensivo: si no pudo listar voces, usar una estándar estable.
-    return { name: 'es-ES-Standard-A', languageCode: 'es-ES' };
+    // Fallback defensivo final: usar la voz del .env o Neural2-F (masculina, verificada).
+    const fallbackName = envPreferred || 'es-ES-Neural2-F';
+    return { name: fallbackName, languageCode: fallbackName.startsWith('es-US-') ? 'es-US' : 'es-ES' };
 };
 
 const synthesizeGoogleTts = async (googleUrl, text, voice) => {
@@ -58,8 +62,8 @@ const synthesizeGoogleTts = async (googleUrl, text, voice) => {
             voice,
             audioConfig: {
                 audioEncoding: 'MP3',
-                speakingRate: 0.95,
-                pitch: -1.0,
+                speakingRate: 1.0,  // velocidad natural
+                pitch: 0.0,         // sin modificar el tono
             },
         };
 
@@ -505,8 +509,8 @@ export const initCoach = async (req, res) => {
     try {
         const userId = req.user.userId;
         const isInterviewMode = req.query.mode === 'interview';
-        const isCvMode       = req.query.mode === 'createcv';
-        const templateId     = req.query.templateId || 'francisco';
+        const isCvMode = req.query.mode === 'createcv';
+        const templateId = req.query.templateId || 'francisco';
 
         // isFirstMessage = true
         let systemPrompt;
@@ -636,6 +640,7 @@ export const ttsCoach = async (req, res) => {
     try {
         const { text } = req.body;
         if (!text) return res.status(400).json({ error: 'El campo text es requerido.' });
+
         const googleTtsKey = getGoogleTtsKey();
         if (!googleTtsKey) {
             return res.status(500).json({
@@ -663,11 +668,12 @@ export const ttsCoach = async (req, res) => {
             const isInvalidVoice = /voice|invalid|supported|not found/i.test(message);
             if (!isInvalidVoice) throw namedVoiceErr;
 
-            console.warn(`[TTS] Voz con name falló (${selectedVoice.name}). Reintentando sin name...`);
+            console.warn(`[TTS] Voz con name falló (${selectedVoice.name}). Reintentando con voces masculinas...`);
             const genericVoiceFallbacks = [
-                { languageCode: 'es-ES', ssmlGender: 'FEMALE' },
-                { languageCode: 'es-US', ssmlGender: 'FEMALE' },
-                { languageCode: 'es-ES' },
+                { name: 'es-ES-Neural2-F', languageCode: 'es-ES' },  // Masculina ✅
+                { name: 'es-ES-Neural2-G', languageCode: 'es-ES' },  // Masculina ✅
+                { name: 'es-ES-Chirp3-HD-Enceladus', languageCode: 'es-ES' }, // Masculina ✅
+                { languageCode: 'es-ES', ssmlGender: 'MALE' },        // Genérico masculino último recurso
             ];
 
             let lastErr = namedVoiceErr;

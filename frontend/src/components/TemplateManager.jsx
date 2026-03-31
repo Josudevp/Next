@@ -200,7 +200,11 @@ const TemplateCarousel = ({ selectedId, onSelect }) => {
 
     const scroll = useCallback((dir) => {
         if (!trackRef.current) return;
-        trackRef.current.scrollBy({ left: dir * 120, behavior: 'smooth' });
+        try {
+            trackRef.current.scrollBy({ left: dir * 120, behavior: 'smooth' });
+        } catch (error) {
+            trackRef.current.scrollLeft += dir * 120;
+        }
     }, []);
 
     return (
