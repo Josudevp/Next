@@ -28,8 +28,14 @@ export const exportCvPdf = async (req, res) => {
             profilePicture || null,
         );
 
-        // waitUntil: 'networkidle0' ensures Google Fonts have finished loading
-        await page.setContent(html, { waitUntil: 'networkidle0', timeout: 30_000 });
+        // Usar 'load' (no 'networkidle0') para evitar bloqueos por peticiones en segundo plano.
+        // Toleramos timeouts para no devolver código 500 si la red de Render va lenta.
+        await page.setContent(html, { waitUntil: 'load', timeout: 15_000 }).catch(err => {
+            console.warn('[exportCvPdf] Aviso de timeout en setContent, continuando...', err.message);
+        });
+
+        // Esperar explícitamente a que las fuentes de Google terminen de cargar.
+        await page.evaluateHandle('document.fonts.ready').catch(() => {});
 
         const pdfBuffer = await page.pdf({
             format: 'Letter',
