@@ -301,9 +301,9 @@ const buildCvGenerationPrompt = async (userId, isFirstMessage = false, templateI
 
         const areaLabel = AREA_LABELS[user.area] || user.area || 'área no especificada';
 
-        const contactDataBlock = `   - Nombre completo\n   - Teléfono/Celular\n   - LinkedIn (URL o usuario)\n   - GitHub (URL o usuario, opcional; si no aplica puede responder NO)\n   - Portafolio web (URL)`;
+        const contactDataBlock = `   - Nombre completo\n   - Correo electrónico\n   - Tipo de documento (CC, TI, Pasaporte, etc.) y Número de documento\n   - Dirección / Ubicación\n   - Teléfono/Celular\n   - LinkedIn (URL o usuario)\n   - GitHub (URL o usuario, opcional; si no aplica puede responder NO)\n   - Portafolio web (URL)`;
 
-        const jsonContactExtra = `    "github": "...",\n    "portfolio": "...",`;
+        const jsonContactExtra = `    "documentType": "...",\n    "documentNumber": "...",\n    "address": "...",\n    "github": "...",\n    "portfolio": "...",`;
 
         const stateRule = isFirstMessage
             ? `ESTADO ACTUAL — PRIMER TURNO: Saluda brevemente en una sola frase y pregunta si desea activar el Modo de Creación Asistida. No hagas ninguna otra pregunta todavía.`

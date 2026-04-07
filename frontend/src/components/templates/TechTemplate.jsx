@@ -56,7 +56,7 @@ const TechTemplate = ({ cvData = {}, profilePicture = null, onFirstExport }) => 
     const contactParts = [
         personalInfo.phone,
         personalInfo.email,
-        personalInfo.linkedin?.replace(/https?:\/\/(www\.)?linkedin\.com\/in\//i, 'linkedin.com/in/'),
+        [personalInfo.documentType, personalInfo.documentNumber].filter(Boolean).join(' '), personalInfo.linkedin?.replace(/https?:\/\/(www\.)?linkedin\.com\/in\//i, 'linkedin.com/in/'),
         personalInfo.github?.replace(/https?:\/\/(www\.)?github\.com\//i, 'github.com/'),
         personalInfo.portfolio,
         personalInfo.address,

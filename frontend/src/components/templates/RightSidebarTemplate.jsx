@@ -73,6 +73,7 @@ const RightSidebarTemplate = ({ cvData = {}, profilePicture = null, onFirstExpor
     const contactItems = [
         { label: personalInfo.phone },
         { label: personalInfo.email },
+        { label: [personalInfo.documentType, personalInfo.documentNumber].filter(Boolean).join(' ') },
         { label: personalInfo.linkedin?.replace(/https?:\/\/(www\.)?linkedin\.com\/in\//i, 'linkedin.com/in/') },
         { label: personalInfo.github?.replace(/https?:\/\/(www\.)?github\.com\//i, 'github.com/') },
         { label: personalInfo.portfolio },

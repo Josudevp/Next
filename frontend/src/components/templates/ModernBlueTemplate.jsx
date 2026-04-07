@@ -60,6 +60,7 @@ const ModernBlueTemplate = ({ cvData = {}, profilePicture = null, onFirstExport 
     const contactItems = [
         { icon: Phone, value: personalInfo.phone },
         { icon: Mail, value: personalInfo.email },
+        { icon: FileText, value: [personalInfo.documentType, personalInfo.documentNumber].filter(Boolean).join(' ') },
         { icon: Linkedin, value: personalInfo.linkedin?.replace(/https?:\/\/(www\.)?linkedin\.com\/in\//i, 'linkedin.com/in/') },
         { icon: Github, value: personalInfo.github?.replace(/https?:\/\/(www\.)?github\.com\//i, 'github.com/') },
         { icon: Globe, value: personalInfo.portfolio },

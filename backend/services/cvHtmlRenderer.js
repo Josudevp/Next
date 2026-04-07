@@ -117,7 +117,7 @@ function renderHarvard(cv, photo) {
 
     const contactLine = [
         p.phone, p.email,
-        fixLinkedIn(p.linkedin), fixGithub(p.github),
+        [p.documentType, p.documentNumber].filter(bool => bool).join(' '), fixLinkedIn(p.linkedin), fixGithub(p.github),
         p.portfolio, p.address,
     ].filter(Boolean).join('   ·   ');
 
@@ -184,6 +184,7 @@ function renderModernBlue(cv, photo) {
     const contactItems = [
         { icon: '&#9990;', value: p.phone },
         { icon: '&#9993;', value: p.email },
+        { icon: '&#128196;', value: [p.documentType, p.documentNumber].filter(Boolean).join(' ') },
         { icon: 'in', value: fixLinkedIn(p.linkedin) },
         { icon: 'gh', value: fixGithub(p.github) },
         { icon: '&#127760;', value: p.portfolio },
@@ -274,7 +275,7 @@ function renderTech(cv, photo) {
 
     const contactParts = [
         p.phone, p.email,
-        fixLinkedIn(p.linkedin), fixGithub(p.github),
+        [p.documentType, p.documentNumber].filter(bool => bool).join(' '), fixLinkedIn(p.linkedin), fixGithub(p.github),
         p.portfolio, p.address,
     ].filter(Boolean);
 
@@ -356,7 +357,7 @@ function renderExecutive(cv, photo) {
 
     const contactLine = [
         p.phone, p.email,
-        fixLinkedIn(p.linkedin), fixGithub(p.github),
+        [p.documentType, p.documentNumber].filter(bool => bool).join(' '), fixLinkedIn(p.linkedin), fixGithub(p.github),
         p.portfolio, p.address,
     ].filter(Boolean).join('  ·  ');
 
@@ -429,7 +430,7 @@ function renderCreative(cv, photo) {
 
     const contactLine = [
         p.phone, p.email,
-        fixLinkedIn(p.linkedin), fixGithub(p.github),
+        [p.documentType, p.documentNumber].filter(bool => bool).join(' '), fixLinkedIn(p.linkedin), fixGithub(p.github),
         p.portfolio, p.address,
     ].filter(Boolean).join('  ·  ');
 
@@ -508,7 +509,7 @@ function renderCorporate(cv, photo) {
 
     const contactItems = [
         p.phone, p.email,
-        fixLinkedIn(p.linkedin), fixGithub(p.github),
+        [p.documentType, p.documentNumber].filter(bool => bool).join(' '), fixLinkedIn(p.linkedin), fixGithub(p.github),
         p.portfolio, p.address,
     ].filter(Boolean);
 
