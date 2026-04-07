@@ -1,5 +1,6 @@
-import { Component, lazy, Suspense } from 'react'
+import { Component, lazy, Suspense, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { clearSession } from './utils/auth'
 import './App.css'
 
 // ── Lazy Loading por ruta ─────────────────────────────────────────────────────
@@ -83,6 +84,23 @@ class GlobalErrorBoundary extends Component {
 
 // ── App ───────────────────────────────────────────────────────────────────────
 function App() {
+  // Sincronización multi-pestaña: si se borra el token en una pestaña, 
+  // redirigimos a login en las demás pestañas activas.
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      // Validamos específicamente la llave 'next_token'
+      if (e.key === 'next_token' && !e.newValue) {
+        clearSession(); // Nos aseguramos de purgar datos también localmente en esta pestaña
+        // Evitamos redirecciones múltiples si ya estamos en /login
+        if (window.location.pathname !== '/login') {
+          window.location.href = '/login';
+        }
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
   return (
     <GlobalErrorBoundary>
       <BrowserRouter>

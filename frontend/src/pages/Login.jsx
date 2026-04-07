@@ -323,7 +323,11 @@ const Login = () => {
                     <img
                         src={LoginJobImg}
                         alt="Persona buscando empleo"
-                        className="w-full max-w-72 lg:max-w-[26rem] xl:max-w-[30rem] drop-shadow-sm"
+                        width="800"
+                        height="800"
+                        loading="eager"
+                        decoding="async"
+                        className="w-full h-auto max-w-72 lg:max-w-[26rem] xl:max-w-[30rem] drop-shadow-sm aspect-square object-contain"
                     />
                 </div>
             </section>
