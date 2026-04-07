@@ -5,6 +5,9 @@ import crypto from 'crypto';
 import { Op } from 'sequelize';
 import { sendEmail } from '../services/emailService.js';
 
+// [SECURITY] Respuesta genérica para evitar user enumeration en flujos de contraseña
+const PASSWORD_RESET_GENERIC_RESPONSE = { mensaje: 'Si el correo está registrado, recibirás un enlace de recuperación en breve.' };
+
 const normalizeUrl = (value) => {
   if (!value) return null;
   return value.endsWith('/') ? value.slice(0, -1) : value;
@@ -135,19 +138,25 @@ export const forgotPassword = async (req, res) => {
 
     const user = await User.findOne({ where: { email: cleanEmail } });
 
+    // [SECURITY FIX #3] Respuesta genérica — no revelar si el email existe o no.
+    // Esto previene user enumeration (OWASP A01 / MITRE T1589.002).
     if (!user) {
-      return res.status(404).json({ mensaje: 'No existe una cuenta asociada a ese correo.' });
+      return res.status(200).json(PASSWORD_RESET_GENERIC_RESPONSE);
     }
 
-    const resetToken = crypto.randomBytes(20).toString('hex');
-    const resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000);
+    // [SECURITY FIX #6] Generar token de 256 bits y guardar SOLO el hash en BD.
+    // Si la BD se compromete, el atacante no puede usar los tokens directamente.
+    const rawToken = crypto.randomBytes(32).toString('hex'); // 256 bits de entropía
+    const hashedToken = crypto.createHash('sha256').update(rawToken).digest('hex');
+    const resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hora
 
-    user.resetPasswordToken = resetToken;
+    user.resetPasswordToken = hashedToken; // ← hash, nunca el raw token
     user.resetPasswordExpires = resetPasswordExpires;
     await user.save();
 
+    // El enlace contiene el raw token (solo el usuario lo tiene en su email)
     const frontendUrl = resolveFrontendUrl(req);
-    const resetUrl = `${frontendUrl}/reset-password/${resetToken}`;
+    const resetUrl = `${frontendUrl}/reset-password/${rawToken}`;
 
     if (!process.env.BREVO_API_KEY || !process.env.EMAIL_USER) {
       return res.status(500).json({ mensaje: 'El servicio de correo no está configurado.' });
@@ -174,7 +183,7 @@ export const forgotPassword = async (req, res) => {
       `,
     });
 
-    return res.json({ mensaje: 'Revisa tu correo para continuar con la recuperación.' });
+    return res.status(200).json(PASSWORD_RESET_GENERIC_RESPONSE);
   } catch (error) {
     console.error(error);
     return res.status(500).json({ mensaje: 'No se pudo enviar el correo de recuperación. Intenta nuevamente.' });
@@ -196,12 +205,26 @@ const fetchGoogleUser = async ({ credential, accessToken }) => {
     return payload;
   }
   if (accessToken) {
-    // Access-token flow: fetch userinfo
-    const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+    // [SECURITY FIX #2] Validar audience del access token antes de usarlo.
+    // Sin esto, un access token de *otra* app puede autenticarse en NEXT.
+    const tokenInfoRes = await fetch(
+      `https://oauth2.googleapis.com/tokeninfo?access_token=${encodeURIComponent(accessToken)}`
+    );
+    if (!tokenInfoRes.ok) throw new Error('Access token de Google inválido');
+    const tokenInfo = await tokenInfoRes.json();
+
+    // Verificar que el token fue emitido para ESTA aplicación (aud o azp)
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    if (clientId && tokenInfo.aud !== clientId && tokenInfo.azp !== clientId) {
+      throw new Error('Access token no emitido para esta aplicación');
+    }
+
+    // Ahora sí obtener el perfil del usuario
+    const profileRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-    if (!res.ok) throw new Error('Access token de Google inválido');
-    return res.json();
+    if (!profileRes.ok) throw new Error('No se pudo obtener el perfil de Google');
+    return profileRes.json();
   }
   throw new Error('Token de Google requerido');
 };
@@ -268,9 +291,13 @@ export const resetPassword = async (req, res) => {
       return res.status(400).json({ mensaje: 'La nueva contraseña es obligatoria' });
     }
 
+    // [SECURITY FIX #6] Hashear el token recibido y buscar el hash en BD.
+    // El raw token viaja solo en el email del usuario — la BD nunca lo almacenó.
+    const hashedIncoming = crypto.createHash('sha256').update(token).digest('hex');
+
     const user = await User.findOne({
       where: {
-        resetPasswordToken: token,
+        resetPasswordToken: hashedIncoming,
         resetPasswordExpires: {
           [Op.gt]: new Date(),
         },

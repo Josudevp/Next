@@ -384,6 +384,32 @@ Para Perfil Profesional, Experiencia y Habilidades:
 - Al preguntar por GitHub usa esta frase exacta o una equivalente muy cercana: "¿Te gustaría añadir un perfil de GitHub? Es una web muy famosa entre desarrolladores; si no eres uno, solo responde NO.".
 - Sé conversacional y breve.
 
+━━━ PROCESAMIENTO OBLIGATORIO DE RESPUESTAS (LEE ESTO ANTES DE GENERAR CUALQUIER JSON) ━━━━
+ANTES de incluir cualquier valor en [CV_PARTIAL] o [CV_FINAL_DATA], DEBES interpretar y normalizar lo que el usuario dijo. NUNCA copies la respuesta cruda del usuario.
+
+REGLAS DE NORMALIZACIÓN (aplican sin excepción):
+1. RESPUESTA NEGATIVA → campo vacío:
+   Si el usuario responde "no", "no tengo", "no tengo uno", "ninguno", "N/A", "nada", o cualquier variante negativa a un campo opcional:
+   → Guarda el campo como "" (cadena vacía). JAMÁS escribas "no", "No", "NO" en el JSON.
+   Campos opcionales sujetos a esta regla: github, portfolio, address, documentType, documentNumber, email, linkedin.
+
+2. DATOS DE TEXTO → escribe exactamente lo que el usuario indicó, pero limpiado:
+   - Elimina frases como "mi nombre es", "me llamo", "es el", "tengo", etc.
+   - Extrae solo el dato concreto. Ejemplo: "me llamo Juan Pérez" → "Juan Pérez".
+   - Ejemplo: "mi teléfono es 3001234567" → "3001234567".
+
+3. CIUDAD / DIRECCIÓN → interpreta correctamente:
+   - Si dice "vivo en Barranquilla" o "Barranquilla" → guarda "Barranquilla".
+   - Si dice "no tengo dirección" → guarda "".
+
+4. ARRAYS (habilidades, idiomas, referencias):
+   - Si el usuario lista ítems separados por comas → convierte a array.
+   - Si dice "ninguno" o "no tengo" → guarda [].
+
+5. BOOLEANOS (includePhoto, projectLabel):
+   - Sí / claro / por supuesto → true.
+   - No / no quiero / sin foto → false.
+
 ━━━ SINCRONIZACIÓN DE VISTA PREVIA EN TIEMPO REAL ━━━━━━━━━━━━━━━━━━━━━━━━━━
 Desde el PASO 0.5 en adelante, al FINAL de cada respuesta donde el usuario aporte datos,
 incluye el siguiente bloque oculto con TODOS los datos recolectados hasta ese momento:
@@ -440,7 +466,8 @@ REGLAS DEL JSON:
 - "skills.technical" y "skills.soft" deben ser arrays, nunca texto plano.
 - "languages" debe ser un array de objetos con "language" y "level". Si no hay idiomas usa [].
 - "personalReferences" y "familyReferences" deben ser arrays. Si no hay referencias usa [].
-- Si el usuario responde NO a GitHub, guarda "github" como "" o "NO".
+- Si el usuario responde NO a cualquier campo opcional → ese campo va como "" (NUNCA pongas "no", "NO" o "No" en el JSON).
+- NUNCA copies literalmente lo que el usuario escribió si includes frases como "no tengo", "me llamo", etc. Extrae solo el dato puro.
 
 ${stateRule}`;
     } catch (error) {
@@ -542,6 +569,9 @@ export const initCoach = async (req, res) => {
 // ══════════════════════════════════════════════════════════════════════════════
 // POST /api/coach/chat
 // ══════════════════════════════════════════════════════════════════════════════
+// [SECURITY] Longitud máxima de mensaje para prevenir Prompt Injection (OWASP LLM01)
+const MAX_MESSAGE_LENGTH = 4000;
+
 export const chatWithCoach = async (req, res) => {
     try {
         const { message, history, isInterviewMode, finishSimulation, isCvMode, templateId } = req.body;
@@ -549,6 +579,12 @@ export const chatWithCoach = async (req, res) => {
 
         if (!message && !finishSimulation) {
             return res.status(400).json({ error: 'El campo message es requerido.' });
+        }
+
+        // [SECURITY FIX #9] Rechazar mensajes demasiado largos — previene Prompt Injection
+        // con payloads masivos y reduce riesgo de context-window abuse en Gemini.
+        if (message && message.length > MAX_MESSAGE_LENGTH) {
+            return res.status(400).json({ error: `El mensaje no puede superar los ${MAX_MESSAGE_LENGTH} caracteres.` });
         }
 
         const isReportRequest = !isCvMode && (finishSimulation ||
@@ -565,8 +601,10 @@ export const chatWithCoach = async (req, res) => {
 
         const model = buildModel(isReportRequest, isCvMode ? false : (isInterviewMode || false), systemPrompt);
 
-        // Limpieza de historial: solo roles 'user' y 'model' válidos
+        // [SECURITY FIX #9] Filtrar mensajes del historial que excedan el límite.
+        // El historial llega desde el cliente — no se puede confiar ciegamente en él.
         let cleanedHistory = (history || [])
+            .filter(msg => msg.text && typeof msg.text === 'string' && msg.text.length <= MAX_MESSAGE_LENGTH)
             .map(msg => ({
                 role: msg.sender === 'ai' ? 'model' : 'user',
                 parts: [{ text: msg.text }]

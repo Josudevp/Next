@@ -147,7 +147,7 @@ const _tplEmeraldSplit = ({ displayName, displayTitle, displaySummary, initials,
 </head>
 <body>
   <nav class="navbar">
-    <span class="navbar-brand">${displayName.split(' ')[0]}<span>.</span></span>
+    <span class="navbar-brand">${displayName.split(' ')[0] || 'Portfolio'}<span>.</span></span>
     <div class="navbar-links">${navLinks}</div>
   </nav>
   <section class="hero">
@@ -280,7 +280,7 @@ const _tplMidnightDark = ({ displayName, displayTitle, displaySummary, initials,
 </head>
 <body>
   <nav class="navbar">
-    <span class="navbar-brand">${displayName.split(' ')[0]}<span>.</span></span>
+    <span class="navbar-brand">${displayName.split(' ')[0] || 'Portfolio'}<span>.</span></span>
     <div class="navbar-links">${navLinks}</div>
   </nav>
   <section class="hero">
@@ -720,13 +720,25 @@ const generatePortfolioHtml = (user, cvData, profilePicture, templateId) => {
     const displayTitle = esc(personalInfo?.title || '');
     const displaySummary = esc(summary || '');
 
-    // Photo: base64 or HTTPS url only
+    // [SECURITY FIX #10] Validar el tipo MIME completo de imágenes base64.
+    // data:image/svg+xml puede contener JS (onload, script tags) y ejecutarse
+    // cuando el browser abre el archivo HTML descargado. Solo se permiten
+    // tipos raster que no tienen capacidad de ejecución de scripts.
+    const ALLOWED_IMAGE_MIMES = [
+        'data:image/png;',
+        'data:image/jpeg;',
+        'data:image/jpg;',
+        'data:image/webp;',
+        'data:image/gif;',
+    ];
     const photoSrc = (() => {
         const pic = profilePicture || personalInfo?.photo;
         if (!pic) return null;
-        if (String(pic).startsWith('data:image/')) return pic; // already base64
-        if (/^https?:\/\//i.test(pic)) return esc(pic);
-        return null;
+        const str = String(pic);
+        // Validar MIME completo — rechazar SVG y cualquier tipo que pueda ejecutar JS
+        if (ALLOWED_IMAGE_MIMES.some(mime => str.startsWith(mime))) return str;
+        if (/^https?:\/\//i.test(str)) return esc(str);
+        return null; // Descartar todo lo demás, incluyendo data:image/svg+xml
     })();
 
     const initials = displayName
@@ -770,23 +782,27 @@ const generatePortfolioHtml = (user, cvData, profilePicture, templateId) => {
         },
     ].filter(Boolean);
 
-    // Experience entries (sorted newest first)
-    const experience = [...rawExp].sort((a, b) => {
+    // [SECURITY FIX #13] Límite en arrays para prevenir DoS por iteración masiva.
+    // Un cvText con 10.000 entradas de experiencia bloquearía el event loop de Node.
+    const MAX_ENTRIES = 50;
+
+    // Experience entries (sorted newest first, max 50)
+    const experience = [...rawExp].slice(0, MAX_ENTRIES).sort((a, b) => {
         const dateA = a.endDate === 'Presente' ? '9999' : (a.endDate || a.startDate || '');
         const dateB = b.endDate === 'Presente' ? '9999' : (b.endDate || b.startDate || '');
         return dateB.localeCompare(dateA);
     });
 
-    const education = [...rawEdu].sort((a, b) => {
+    const education = [...rawEdu].slice(0, MAX_ENTRIES).sort((a, b) => {
         const dateA = a.endDate === 'Presente' ? '9999' : (a.endDate || a.startDate || '');
         const dateB = b.endDate === 'Presente' ? '9999' : (b.endDate || b.startDate || '');
         return dateB.localeCompare(dateA);
     });
 
-    const projects = Array.isArray(cvData.projects) ? cvData.projects : [];
+    const projects = Array.isArray(cvData.projects) ? cvData.projects.slice(0, MAX_ENTRIES) : [];
 
     const validLangs = Array.isArray(languages)
-        ? languages.filter(l => l && (l.language || typeof l === 'string'))
+        ? languages.slice(0, 20).filter(l => l && (l.language || typeof l === 'string'))
         : [];
 
     // ── Section builders ─────────────────────────────────────────────────────
@@ -943,7 +959,7 @@ const generatePortfolioHtml = (user, cvData, profilePicture, templateId) => {
         const _last = _lastUsedTemplate.get(_userId);
         const _available = _TEMPLATE_IDS.filter(id => id !== _last);
         _chosenId = _available[Math.floor(Math.random() * _available.length)];
-        _lastUsedTemplate.set(_userId, _chosenId);
+        _setLastTemplate(_userId, _chosenId); // [FIX #12] usar helper LRU
     }
 
     if (_tplFns[_chosenId]) return _tplFns[_chosenId](_tplData);
@@ -1164,7 +1180,7 @@ const generatePortfolioHtml = (user, cvData, profilePicture, templateId) => {
 
   <!-- ── Navbar ──────────────────────────────────────────── -->
   <nav class="navbar">
-    <span class="navbar-brand">${displayName.split(' ')[0]}<span>.</span></span>
+    <span class="navbar-brand">${displayName.split(' ')[0] || 'Portfolio'}<span>.</span></span>
     <div class="navbar-links">${navLinks}</div>
   </nav>
 

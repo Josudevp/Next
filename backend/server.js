@@ -29,24 +29,24 @@ const normalizeFrontendUrl = (url) => {
   return clean.startsWith('http') ? clean : `https://${clean}`;
 };
 
+// [SECURITY FIX #5] Lista blanca explícita — sin wildcards de onrender.com.
+// El regex anterior (/.*\.onrender\.com/) permitía que CUALQUIER app
+// desplegada en Render hiciera peticiones cross-origin con credentials.
 const allowedOrigins = [
   normalizeFrontendUrl(process.env.FRONTEND_URL),
   'http://localhost:5173',
   'http://localhost:4173',
   'https://next-col.online',
   'https://www.next-col.online',
-  'https://next-backend-i6el.onrender.com',
 ].filter(Boolean);
-
-// Regex de seguridad: acepta cualquier subdominio de onrender.com en caso
-// de que el FRONTEND_URL no esté configurado o cambie de URL.
-const ONRENDER_REGEX = /^https:\/\/.*\.onrender\.com$/;
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin) return callback(null, true); // Postman, curl, etc.
-      if (allowedOrigins.includes(origin) || ONRENDER_REGEX.test(origin)) {
+      // En desarrollo sin Origin (Postman, curl): permitir.
+      // En producción esto es aceptable porque no hay credentials desde curl.
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
       console.error(`[CORS] Bloqueado: ${origin} | Permitidos: ${allowedOrigins.join(', ')}`);
@@ -62,8 +62,10 @@ app.use(
 // Must be placed BEFORE routes and body parsers.
 app.use(compression({ threshold: 1024 })); // only compress responses > 1 KB
 
-// 10 MB limit to accommodate base64-encoded profile pictures in PDF export requests
-app.use(express.json({ limit: '10mb' }));
+// [SECURITY FIX #8] Límite global reducido a 100 KB.
+// El endpoint de exportación de PDF (que necesita imágenes base64 grandes)
+// aplica su propio límite de 10 MB directamente en su ruta.
+app.use(express.json({ limit: '100kb' }));
 
 // ── Rutas ────────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);
@@ -77,17 +79,14 @@ app.use('/api/portfolio', portfolioRoutes); // Portfolio web generator
 // ── Health checks para Render ─────────────────────────────────────────────────
 // Render hace un GET periódico para verificar que el servicio está vivo.
 // Exponemos dos rutas: / (raíz genérica) y /health (explícita y recomendada).
+// [SECURITY FIX #7] Health checks sin info disclosure.
+// No se expone NODE_ENV ni detalles de la app — solo el estado necesario para Render.
 app.get('/', (_req, res) => {
-  res.status(200).json({ status: 'ok', app: 'NEXT Backend', env: process.env.NODE_ENV });
+  res.status(200).json({ status: 'ok' });
 });
 
 app.get('/health', (_req, res) => {
-  res.status(200).json({
-    status: 'healthy',
-    app: 'NEXT Backend',
-    env: process.env.NODE_ENV || 'development',
-    timestamp: new Date().toISOString(),
-  });
+  res.status(200).json({ status: 'healthy' });
 });
 
 // ── Sincronización con la BD y arranque ──────────────────────────────────────

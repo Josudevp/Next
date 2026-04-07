@@ -1,5 +1,12 @@
 import jwt from 'jsonwebtoken';
 
+// [SECURITY] Fail-fast: si JWT_SECRET no está definida, el middleware no puede
+// operar de forma segura. Lanzar error en arranque evita el fallback a clave predecible.
+if (!process.env.JWT_SECRET) {
+    console.error('[FATAL] JWT_SECRET no está definida en las variables de entorno. El servidor no puede operar de forma segura.');
+    process.exit(1);
+}
+
 export const authMiddleware = (req, res, next) => {
     // Buscar en el header de la petición (Bearer {token})
     const authHeader = req.headers.authorization;
@@ -11,15 +18,13 @@ export const authMiddleware = (req, res, next) => {
     try {
         const token = authHeader.split(' ')[1];
 
-        // Decodificar el token usando la clave secreta
-        const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret_key');
+        // [SECURITY] Sin fallback — JWT_SECRET debe existir o el proceso ya habría terminado.
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-        // Adjuntar el ID del usuario al request (depende de cómo guardaste el payload en authController)
-        // Generalmente es { id: userId }
         req.user = decoded;
-
         next();
     } catch (error) {
+        // No exponer detalles del error al cliente (information disclosure)
         return res.status(401).json({ mensaje: 'No autorizado, token inválido' });
     }
 };
