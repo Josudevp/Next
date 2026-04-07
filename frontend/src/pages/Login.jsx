@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { Mail, Lock, AlertCircle } from 'lucide-react'
 import { useGoogleLogin } from '@react-oauth/google'
@@ -19,9 +19,24 @@ const sanitize = (value) => value.trim()
 const Login = () => {
     const navigate = useNavigate()
 
+    // [FIX #1] Ref guard — previene doble submit por clic rápido antes de que
+    // React re-renderice con isLoading=true. El flag de estado no es suficiente
+    // porque no bloquea en el mismo tick del event loop.
+    const isSubmittingRef = useRef(false)
+    // [FIX #5] AbortController — cancela el fetch si el componente se desmonta
+    // durante la petición (ej. usuario navega atrás mientras espera).
+    const abortControllerRef = useRef(null)
+
     const [formData, setFormData] = useState({ email: '', password: '', rememberMe: false })
     const [errores, setErrores] = useState({})
     const [isLoading, setIsLoading] = useState(false)
+
+    // Cleanup al desmontar: abortar cualquier fetch pendiente
+    useEffect(() => {
+        return () => {
+            abortControllerRef.current?.abort()
+        }
+    }, [])
 
     // Actualiza el campo y limpia su error en tiempo real
     const handleChange = (e) => {
@@ -50,11 +65,21 @@ const Login = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault()
+
+        // [FIX #1] Bloquear submits simultáneos — el estado de React no es
+        // suficiente porque no actualiza en el mismo tick del evento de clic.
+        if (isSubmittingRef.current) return
+
         const errs = validate()
         if (Object.keys(errs).length > 0) { setErrores(errs); return }
 
+        isSubmittingRef.current = true
         setIsLoading(true)
-        setErrores({}) // Limpiar errores previos
+        setErrores({})
+
+        // [FIX #5] Crear AbortController para poder cancelar el fetch si el
+        // componente se desmonta mientras la petición está en curso.
+        abortControllerRef.current = new AbortController()
 
         try {
             const email = sanitize(formData.email)
@@ -63,47 +88,46 @@ const Login = () => {
 
             const response = await fetch(`${API_URL}/auth/login`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({ email, password, rememberMe })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email, password, rememberMe }),
+                signal: abortControllerRef.current.signal,
             })
 
             const data = await response.json()
 
             if (!response.ok) {
-                // Manejar errores (ej. 401, 404)
                 setErrores({ global: data.mensaje || 'Error al iniciar sesión' })
                 return
             }
 
-            // Éxito
             localStorage.setItem('next_token', data.token)
             localStorage.setItem('next_user', JSON.stringify(data.user))
             localStorage.setItem('next_session', 'true')
 
-            // Redirigir al dashboard
             navigate('/dashboard', { replace: true })
         } catch (error) {
+            // AbortError ocurre cuando el usuario navega antes de recibir respuesta
+            if (error.name === 'AbortError') return
             console.error('Error en login:', error)
             setErrores({ global: 'Error de conexión con el servidor.' })
         } finally {
+            isSubmittingRef.current = false
             setIsLoading(false)
         }
     }
 
     const googleLogin = useGoogleLogin({
         onSuccess: async (tokenResponse) => {
+            if (isSubmittingRef.current) return
+            isSubmittingRef.current = true
             setIsLoading(true)
             setErrores({})
+
+            // [FIX #2] Eliminada la llamada redundante a googleapis.com/userinfo.
+            // El backend ya valida el accessToken contra Google en authController.js
+            // (Fix #2 de seguridad). Hacer el fetch aquí duplicaba la validación
+            // y añadía ~300ms de latencia innecesaria en cada login con Google.
             try {
-                // Exchange access token for user info, then send credential to backend
-                const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-                    headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
-                })
-                if (!userInfoRes.ok) throw new Error('No se pudo obtener perfil de Google')
-                // Use the id_token from the tokenResponse if available
-                // For implicit flow we use the access token approach via backend
                 const response = await fetch(`${API_URL}/auth/google`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -119,9 +143,11 @@ const Login = () => {
                 localStorage.setItem('next_session', 'true')
                 navigate(data.needsOnboarding ? '/onboarding' : '/dashboard', { replace: true })
             } catch (err) {
+                if (err.name === 'AbortError') return
                 console.error('[Google Login]', err)
                 setErrores({ global: 'Error al conectar con Google. Intenta de nuevo.' })
             } finally {
+                isSubmittingRef.current = false
                 setIsLoading(false)
             }
         },

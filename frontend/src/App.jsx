@@ -1,5 +1,5 @@
 import { Component, lazy, Suspense } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './App.css'
 
 // ── Lazy Loading por ruta ─────────────────────────────────────────────────────
@@ -106,9 +106,10 @@ function App() {
             <Route path="/coach" element={
               <ProtectedRoute><IACoach /></ProtectedRoute>
             } />
-            <Route path="/ia-coach" element={
-              <ProtectedRoute><IACoach /></ProtectedRoute>
-            } />
+            {/* [FIX #7] /ia-coach era una ruta duplicada que montaba el mismo
+                componente dos veces, causando estados de React desincronizados.
+                Ahora redirige a la URL canónica /coach. */}
+            <Route path="/ia-coach" element={<Navigate to="/coach" replace />} />
             <Route path="/job-hunter" element={
               <ProtectedRoute><JobHunter /></ProtectedRoute>
             } />

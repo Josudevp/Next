@@ -58,6 +58,8 @@ const ChatCoach = () => {
     const [input, setInput] = useState('');
     const [isTyping, setIsTyping] = useState(true);
     const [isListening, setIsListening] = useState(false);
+    // [FIX #6] Mensaje progresivo para esperas largas de Gemini Pro (hasta 90s)
+    const [slowResponseMsg, setSlowResponseMsg] = useState(null);
 
     // Referencias
     const messagesEndRef = useRef(null);
@@ -67,9 +69,26 @@ const ChatCoach = () => {
     const sendMessageRef = useRef(null);
     const silenceTimerRef = useRef(null);
     const prevInputRef = useRef('');
+    // [FIX #6] Ref del timer de feedback progresivo para limpieza al desmontar
+    const slowTimerRef = useRef(null);
 
     // Actualizar referencias en cada render para prevenir stale closures en eventos
     isInterviewModeRef.current = isInterviewMode;
+
+    // [FIX #6] Feedback progresivo — si la IA tarda más de 15s, mostrar aviso.
+    // El timeout de axiosInstance es 90s (necesario para reportes con Gemini Pro).
+    // Sin este feedback el usuario ve una pantalla de carga indefinida sin contexto.
+    useEffect(() => {
+        if (isTyping) {
+            slowTimerRef.current = setTimeout(() => {
+                setSlowResponseMsg('¡Casi listo! Generando un análisis profundo... esto puede tardar hasta 1 minuto.');
+            }, 15000);
+        } else {
+            clearTimeout(slowTimerRef.current);
+            setSlowResponseMsg(null);
+        }
+        return () => clearTimeout(slowTimerRef.current);
+    }, [isTyping]);
 
     // 2. Auto-scroll
     const scrollToBottom = () => {
@@ -739,7 +758,7 @@ const ChatCoach = () => {
                                     );
                                 })}
 
-                                {/* Indicador de "Escribiendo..." */}
+                                {/* Indicador de "Escribiendo..." con feedback progresivo [FIX #6] */}
                                 {isTyping && (
                                     <div className="flex w-full justify-start animate-fade-in mb-4">
                                         <div className="flex gap-2 flex-row">
@@ -751,7 +770,7 @@ const ChatCoach = () => {
                                                 <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce [animation-delay:-0.15s]"></span>
                                                 <span className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce"></span>
                                                 <span className="text-xs text-gray-400 ml-1.5 font-medium">
-                                                    Analizando respuesta...
+                                                    {slowResponseMsg || 'Analizando respuesta...'}
                                                 </span>
                                             </div>
                                         </div>

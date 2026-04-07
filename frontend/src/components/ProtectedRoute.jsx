@@ -1,27 +1,33 @@
 import { Navigate, useLocation } from 'react-router-dom'
+import { isTokenValid } from '../utils/auth'
 
 /**
  * ProtectedRoute — Guardia de rutas privadas
  *
- * Verifica que existan AMBAS claves de sesión antes de renderizar
- * el contenido protegido. Si falta cualquiera, redirige a /login.
+ * [FIX #3] Ahora valida la expiración real del JWT en el cliente
+ * decodificando el campo `exp` del payload. Antes solo verificaba
+ * la existencia de las claves en localStorage, lo que permitía que
+ * un token expirado pasara el guard y causara un flicker al montar
+ * el componente antes de recibir el 401 del backend.
  *
  * Uso en App.jsx:
  *   <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
- *
- * El estado `from` preserva la ruta que el usuario intentaba visitar,
- * para que Login pueda redirigirlo allí después de autenticarse.
  */
 const ProtectedRoute = ({ children }) => {
     const location = useLocation()
 
-    const token = localStorage.getItem('next_token')
     const session = localStorage.getItem('next_session')
 
-    const isAuthenticated = !!(token && session)
+    // isTokenValid() decodifica el JWT y compara exp * 1000 con Date.now()
+    const isAuthenticated = isTokenValid() && !!session
 
     if (!isAuthenticated) {
-        // replace:true evita que /dashboard quede en el historial
+        // Limpiar sesión si el token expiró para no dejar claves huérfanas
+        if (!isTokenValid()) {
+            localStorage.removeItem('next_token')
+            localStorage.removeItem('next_session')
+            localStorage.removeItem('next_user')
+        }
         return (
             <Navigate
                 to="/login"
