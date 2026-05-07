@@ -1,4 +1,4 @@
-/**
+g/**
  * Migración: Agregar columna experienceLevel a Users
  * 
  * Ejecutar una sola vez con: node migrations/add-experience-level.js
@@ -11,7 +11,7 @@ import sequelize from '../config/db.js';
 
 const runMigration = async () => {
   try {
-    console.log('🔄 Iniciando migración: agregar experienceLevel...');
+    console.log('Iniciando migración: agregar experienceLevel...');
     
     // Verificar si la columna ya existe
     const [results] = await sequelize.query(`
@@ -23,7 +23,7 @@ const runMigration = async () => {
     `);
 
     if (results.length > 0) {
-      console.log('⚠️  La columna experienceLevel ya existe. Migración omitida.');
+      console.log(' La columna experienceLevel ya existe. Migración omitida.');
       process.exit(0);
     }
 
@@ -33,12 +33,12 @@ const runMigration = async () => {
       ADD COLUMN experienceLevel VARCHAR(255) DEFAULT 'Sin experiencia' AFTER jobType
     `);
 
-    console.log('✅ Columna experienceLevel agregada exitosamente');
-    console.log('✅ Migración completada');
+    console.log(' Columna experienceLevel agregada exitosamente');
+    console.log(' Migración completada');
     
     process.exit(0);
   } catch (error) {
-    console.error('❌ Error en la migración:', error.message);
+    console.error(' Error en la migración:', error.message);
     process.exit(1);
   }
 };

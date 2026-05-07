@@ -4,6 +4,66 @@
 import axiosInstance from '../api/axiosInstance';
 
 /**
+ * Compresses a base64 profile picture so it stays well under the ~1 MB proxy
+ * limit imposed by Render.com's free-plan Nginx gateway (which applies
+ * regardless of Express's own `limit` setting).
+ *
+ * Strategy:
+ *  - Draw the image onto a canvas capped at MAX_DIM × MAX_DIM.
+ *  - Re-encode as JPEG at QUALITY.
+ *  - If the result is still too large, halve quality iteratively.
+ *
+ * @param {string} dataUrl  - Original base64 data-URL (any format).
+ * @returns {Promise<string>} Compressed base64 data-URL, or the original if
+ *                            it was already small enough or compression failed.
+ */
+async function compressProfilePicture(dataUrl) {
+    if (!dataUrl) return null;
+
+    const MAX_DIM = 400;   // max width / height in pixels
+    const MAX_BYTES = 150_000; // ~150 KB base64 target
+    let quality = 0.72;
+
+    try {
+        // Load image
+        const img = await new Promise((resolve, reject) => {
+            const i = new Image();
+            i.onload = () => resolve(i);
+            i.onerror = reject;
+            i.src = dataUrl;
+        });
+
+        // Calculate target dimensions (maintain aspect ratio)
+        let { naturalWidth: w, naturalHeight: h } = img;
+        if (w > MAX_DIM || h > MAX_DIM) {
+            const ratio = Math.min(MAX_DIM / w, MAX_DIM / h);
+            w = Math.round(w * ratio);
+            h = Math.round(h * ratio);
+        }
+
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+
+        // Iteratively lower quality until the payload is small enough
+        let compressed;
+        do {
+            compressed = canvas.toDataURL('image/jpeg', quality);
+            // base64 size in bytes ≈ length * 0.75
+            if (compressed.length * 0.75 <= MAX_BYTES) break;
+            quality = parseFloat((quality - 0.1).toFixed(2));
+        } while (quality > 0.2);
+
+        return compressed;
+    } catch (err) {
+        // If compression fails for any reason, fall back to the original
+        console.warn('[pdfUtils] compressProfilePicture failed, using original:', err);
+        return dataUrl;
+    }
+}
+
+/**
  * Requests a server-side PDF from the Puppeteer endpoint and immediately
  * triggers a browser file-save/download — no window.print(), no page preview,
  * works identically on Android, iOS, and desktop.
@@ -14,9 +74,16 @@ import axiosInstance from '../api/axiosInstance';
  * @param {string} personName      - Used to build the filename (e.g. "Josué Molina").
  */
 export async function downloadCvPdf(cvData, templateId, profilePicture, personName) {
+    // Compress the profile picture BEFORE sending — Render.com's free-plan
+    // Nginx proxy hard-caps request bodies at ~1 MB, causing a 413 error when
+    // a full-resolution base64 photo is included.
+    const compressedPhoto = profilePicture
+        ? await compressProfilePicture(profilePicture)
+        : null;
+
     const response = await axiosInstance.post(
         '/export/pdf',
-        { cvData, templateId, profilePicture: profilePicture || null },
+        { cvData, templateId, profilePicture: compressedPhoto },
         { responseType: 'arraybuffer', timeout: 120_000 },
     );
 

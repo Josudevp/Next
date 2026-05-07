@@ -64,8 +64,10 @@ app.use(compression({ threshold: 1024 })); // only compress responses > 1 KB
 
 // [SECURITY FIX #8] Límite global reducido a 100 KB.
 // El endpoint de exportación de PDF (que necesita imágenes base64 grandes)
-// aplica su propio límite de 10 MB directamente en su ruta.
-app.use(express.json({ limit: '100kb' }));
+// aplica su propio límite de 50 MB directamente en su ruta (ver exportRoutes.js).
+// Pero para que no colisionen dejaremos el middleware global un poco holgado
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // ── Rutas ────────────────────────────────────────────────────────────────────
 app.use('/api/auth', authRoutes);

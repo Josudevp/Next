@@ -14,6 +14,10 @@ export default defineConfig({
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,
+        // PDF export can take several seconds + carries a large payload.
+        // Without these, Vite's http-proxy cuts the request with a 413/504.
+        proxyTimeout: 120_000,  // 120 s — matches axiosInstance timeout
+        timeout: 120_000,
       },
     },
   },

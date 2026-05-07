@@ -39,7 +39,7 @@ const Home = () => {
             {/* Logo - Always Top Left */}
             <nav className='absolute top-4 left-5 z-20 sm:left-6 md:top-6 md:left-16'>
                 <LogoNext />
-            </nav>
+            </nav> 
 
             {/* BETA badge */}
             <div className='absolute top-4 right-5 z-20 sm:right-6 md:top-6 md:right-10 lg:right-16'>
